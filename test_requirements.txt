@@ -1,0 +1,5 @@
+nose>=1.0.0,<2.0
+webtest>=2.0.18,<3.0
+psycopg2
+coverage
+python-coveralls
