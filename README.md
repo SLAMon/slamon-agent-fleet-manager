@@ -48,12 +48,12 @@ cd $SLAMON_ROOT
 python ./slamon_afm/admin.py --drop-tables
 ```
 
-## Creating python virtualenv and installing needed packages
+## Creating python virtualenv and installing Agent Fleet Manager
 ```
 cd $SLAMON_ROOT
 virtualenv env
 . env/bin/active
-pip install -r requirements_afm.txt
+pip install .
 ```
 
 # Running
@@ -68,12 +68,14 @@ python ./slamon_afm/afm.py
 In virtual environment:
 ```
 cd $SLAMON_ROOT
+pip install -r test_requirements.txt
 nosetests
 ```
 or (if coverage report is also wanted)
 ```
 cd $SLAMON_ROOT
-nosetests --with-coverage --cover-package=slamon
+pip install -r test_requirements.txt
+nosetests --with-coverage --cover-package=slamon_afm
 ```
 
 [license]: https://img.shields.io/:license-Apache%20License%20v2.0-blue.svg
