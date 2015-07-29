@@ -3,10 +3,15 @@ SLAMon Agent Fleet Manager (AFM)
 
 [![License][license]](http://www.apache.org/licenses/LICENSE-2.0)
 
-[![Requirements Status][req_image]][requirements]
+[![Latest PyPI Version](https://badge.fury.io/py/slamon-afm.svg)](http://badge.fury.io/py/slamon-afm)
+[![Supported Python Versions](https://img.shields.io/pypi/pyversions/slamon-afm.svg)](pypi)
+[![Requirements Status][requirements_image]][requirements]
+
 [![Build Status][build]](https://travis-ci.org/SLAMon/slamon-agent-fleet-manager.svg?branch=master)
 [![Coverage Status][coverage]](https://coveralls.io/github/SLAMon/slamon-agent-fleet-manager?branch=master)
 [![Code Health][health]](https://landscape.io/github/SLAMon/slamon-agent-fleet-manager/master)
+
+
 
 $SLAMON_ROOT refers to the directory where the root of this repository lies
 
@@ -79,8 +84,11 @@ nosetests --with-coverage --cover-package=slamon_afm
 ```
 
 [license]: https://img.shields.io/:license-Apache%20License%20v2.0-blue.svg
-[req_image]: https://requires.io/github/SLAMon/slamon-agent-fleet-manager/requirements.svg?branch=master
+[requirements_image]: https://requires.io/github/SLAMon/slamon-agent-fleet-manager/requirements.svg?branch=master
 [requirements]: https://requires.io/github/SLAMon/slamon-agent-fleet-manager/requirements/?branch=master
 [build]: https://travis-ci.org/SLAMon/slamon-agent-fleet-manager.svg?branch=master
 [coverage]: https://coveralls.io/repos/SLAMon/slamon-agent-fleet-manager/badge.svg?branch=master&service=github
 [health]: https://landscape.io/github/SLAMon/slamon-agent-fleet-manager/master/landscape.svg?style=flat
+[latest_version]: https://badge.fury.io/py/slamon-afm.svg
+[pypi]: https://pypi.python.org/pypi/slamon-afm/
+
