@@ -12,12 +12,8 @@ SLAMon Agent Fleet Manager (AFM)
 [![Code Health][health]](https://landscape.io/github/SLAMon/slamon-agent-fleet-manager/master)
 
 
-
-$SLAMON_ROOT refers to the directory where the root of this repository lies
-
 # Requirements
-* python 3.4
-* virtualenv
+* python 3.3+
 
 # Setting up
 File slamon_afm/settings.py contains AFM settings in following format:
@@ -43,34 +39,32 @@ postgres=# GRANT ALL PRIVILEGES ON DATABASE slamon_tests TO afm;
 
 To create needed tables:
 ```
-cd $SLAMON_ROOT
-python ./slamon_afm/admin.py --create-tables
+slamon-afm create-tables
 ```
 
 To delete tables:
 ```
-cd $SLAMON_ROOT
-python ./slamon_afm/admin.py --drop-tables
+slamon-afm drop-tables
 ```
 
 ## Creating python virtualenv and installing Agent Fleet Manager
 ```
-cd $SLAMON_ROOT
-virtualenv env
-. env/bin/active
-pip install .
+pip install slamon-afm
 ```
 
 # Running
 ## Running afm
-After entering the virtual environment type in a terminal following:
+Running an instance of AFM from commandline
 ```
-cd $SLAMON_ROOT
-export PYTHONPATH=`pwd`
-python ./slamon_afm/afm.py
+slamon-afm run HOST_NAME
 ```
+For example running AFM on localhost
+```
+slamon-afm run localhost
+```
+
 ### Running tests
-In virtual environment:
+$SLAMON_ROOT refers to the repository root.
 ```
 cd $SLAMON_ROOT
 pip install -r test_requirements.txt
@@ -91,4 +85,5 @@ nosetests --with-coverage --cover-package=slamon_afm
 [health]: https://landscape.io/github/SLAMon/slamon-agent-fleet-manager/master/landscape.svg?style=flat
 [latest_version]: https://badge.fury.io/py/slamon-afm.svg
 [pypi]: https://pypi.python.org/pypi/slamon-afm/
+
 
