@@ -33,3 +33,12 @@ notifications:
   "    on_start": false
 after_success:
 - overalls
+deploy:
+  provider: pypi
+  user: slamon
+  password:
+    secure: HrPCBzDVOnHYZQkP9OcHkOPLwqwKfvv/+N3Np9vcBpIpOSpzarZ+ihN9bpAsud7MUy8m0R1M8b9yXPySYaWK4PfjLXRbcyi4Q3WLDXECar2dpUqKDrd/9dIGEiLGy1RgRXx/fizOew9K+5UOtVCYxITzj5x9Nesfkd1hynEbEZlmr1ZfCgK4m1LloirrRN/YrxkC6/kP2BptpR4itTnsrwnj0xDoIYqKPKZXpv6DpfuV+Pkw2qLt93ArIoaV+os/r+DJAIJAcwrYXmd2ySE62+/x0hkk+9ic8G54VoOum8BahBEQV9tZyBV1Olt4jQC3ZI5LwdAQl8SkpSCrpu1o9gN/JlyLWRy/3/oiy4JymogKTwZ0sCOMB55ZagWrHMcoKy7KMBJzN5GrcJPmXdVCYsKNYs/0r3/aBBNgZFqzZfGkFOb6enJLFy4STO7mvvpUwLC7xcJrn3pZFhZQD5Bv984qtsBpZ9bKkVH0gly8sASvG61I29bsIAkIdbiYzLKWsxeq3S0LyGWQa2ftN16pIYlOK+K6Pgc2STYg08nktlbN+zIurhWi5ZdAqPGnPK2MViERHbC3bDCKPhkTEjq6X4Hra2mjTJxjUbotpByq21PZlQ7CX+NFLqdMRVwgJTR8oX8BUVsBoZZ+zjDmOtZE6VXKF1S+9Z0TVqg8GXfLkZI=
+  on:
+    tags: true
+    branch: master
+    repo: SLAMon/slamon-agent-fleet-manager

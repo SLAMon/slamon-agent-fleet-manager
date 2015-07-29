@@ -9,7 +9,7 @@ short_description = 'SLAMon Agent Fleet Manager is part of the Coordinator, whic
 
 setup(
     name='slamon-afm',
-    version='0.9.0',
+    version='1.0.0',
     description=short_description,
     url='https://github.com/SLAMon/slamon-agent-fleet-manager',
     author='SLAMon',
