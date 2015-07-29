@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 import argparse
-
 import logging
 
 from bottle import run
-import sys
 
 from slamon_afm import afm_app
 from slamon_afm.admin import create_tables, drop_tables
@@ -12,7 +10,6 @@ from slamon_afm.settings import Settings
 from slamon_afm.routes import agent_routes, bpms_routes, status_routes
 from slamon_afm.routes.testing import testing_routes
 from slamon_afm.database import init_connection
-
 
 LOGGING = {
     'version': 1,
@@ -47,8 +44,8 @@ def main():
     parser = argparse.ArgumentParser(description='Admin util for SLAMon Agent Fleet Manager')
     subparsers = parser.add_subparsers()
 
-    run_parser = subparsers.add_parser('run', help='Run AFM',
-                                       description='Run an instance of an Agent Fleet Manager that listens to given host address')
+    run_parser = subparsers.add_parser('run', help='Run AFM', description='Run an instance of an Agent Fleet Manager '
+                                                                          'that listens to given host address')
     run_parser.add_argument('host', help='Host name or address e.g. localhost or 127.0.0.1', action='store')
     run_parser.set_defaults(func=run_afm)
 

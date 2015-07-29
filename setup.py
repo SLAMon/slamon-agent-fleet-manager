@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-import os
-
 from setuptools import find_packages, setup
 
 short_description = 'SLAMon Agent Fleet Manager is part of the Coordinator, which controls deployed agents by giving ' \

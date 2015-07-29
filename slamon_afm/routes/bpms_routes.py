@@ -90,7 +90,7 @@ def post_task():
 
 @app.get('/task/<task_uuid:re:[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}>')
 @app.get('/task/<task_uuid:re:[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}>/')
-def get_task(task_uuid: str):
+def get_task(task_uuid):
     """
     Gets information about single task with uuid task_uuid
     :param task_uuid: uuid of the task
