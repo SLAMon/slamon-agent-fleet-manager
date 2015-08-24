@@ -1,18 +1,16 @@
 import json
 
+import jsonschema
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.exc import IntegrityError, ProgrammingError
-from bottle import request, HTTPError
-import jsonschema
+from flask.blueprints import Blueprint
+from flask import request, abort, jsonify, current_app
 
-from slamon_afm.tables import Task
-from slamon_afm.afm_app import app
-from slamon_afm.slamon_logging import getSLAMonLogger
-from slamon_afm.database import create_session
+from slamon_afm.models import db, Task
 
-logger = getSLAMonLogger(__name__)
+blueprint = Blueprint('bpms', __name__)
 
-post_task_schema = {
+POST_TASK_SCHEMA = {
     'type': 'object',
     'properties': {
         'task_id': {
@@ -38,20 +36,17 @@ post_task_schema = {
 }
 
 
-@app.post('/task')
-@app.post('/task/')
+@blueprint.route('/task', methods=['POST'], strict_slashes=False)
 def post_task():
     data = request.json
 
     if data is None:
-        raise HTTPError(400)
+        abort(400)
 
     try:
-        jsonschema.validate(data, post_task_schema)
+        jsonschema.validate(data, POST_TASK_SCHEMA)
     except jsonschema.ValidationError:
-        raise HTTPError(400)
-
-    session = create_session()
+        abort(400)
 
     task_uuid = str(data['task_id'])
     task_type = str(data['task_type'])
@@ -70,26 +65,25 @@ def post_task():
         task.data = task_data
 
     try:
-        session.add(task)
+        db.session.add(task)
     except IntegrityError:
-        session.rollback()
-        raise HTTPError(400)
+        db.session.rollback()
+        abort(400)
 
     try:
-        session.commit()
+        db.session.commit()
     except (IntegrityError, ProgrammingError):
-        session.rollback()
-        logger.error("Failed to commit database changes for BPMS task POST")
-        raise HTTPError(400)
-    finally:
-        session.close()
+        db.session.rollback()
+        current_app.logger.error("Failed to commit database changes for BPMS task POST")
+        abort(400)
 
-    logger.info("Task posted by BPMS - Task's type: {}, test process id: {}, uuid: {}, parameters: {}"
-                .format(task_type, task_test_id, task_uuid, task_data))
+    current_app.logger.info("Task posted by BPMS - Task's type: {}, test process id: {}, uuid: {}, parameters: {}"
+                            .format(task_type, task_test_id, task_uuid, task_data))
+
+    return ('', 200)
 
 
-@app.get('/task/<task_uuid:re:[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}>')
-@app.get('/task/<task_uuid:re:[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}>/')
+@blueprint.route('/task/<uuid:task_uuid>', methods=['GET'], strict_slashes=False)
 def get_task(task_uuid):
     """
     Gets information about single task with uuid task_uuid
@@ -107,18 +101,12 @@ def get_task(task_uuid):
         'task_error': 'Something went wrong'                # Error that caused task to fail (if failed)
     }
     """
-    try:
-        session = create_session()
-    except:
-        raise HTTPError(500)
 
     try:
-        query = session.query(Task)
+        query = db.session.query(Task)
         task = query.filter(Task.uuid == str(task_uuid)).one()
     except NoResultFound:
-        raise HTTPError(404)
-    finally:
-        session.close()
+        abort(404)
 
     task_desc = {
         'task_id': task.uuid,
@@ -137,4 +125,4 @@ def get_task(task_uuid):
         task_desc['task_completed'] = str(task.completed)
         task_desc['task_result'] = json.loads(task.result_data)
 
-    return task_desc
+    return jsonify(task_desc)

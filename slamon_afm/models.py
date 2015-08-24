@@ -1,12 +1,13 @@
 from datetime import datetime
 
+from flask.ext.sqlalchemy import SQLAlchemy
 from sqlalchemy import Column, Integer, CHAR, DateTime, String, ForeignKey, PrimaryKeyConstraint, Unicode
 from sqlalchemy.orm import relationship
 
-from slamon_afm.database import Base
+db = SQLAlchemy()
 
 
-class Agent(Base):
+class Agent(db.Model):
     __tablename__ = 'agents'
 
     uuid = Column('uuid', CHAR(36), primary_key=True, nullable=False)
@@ -14,7 +15,7 @@ class Agent(Base):
     last_seen = Column('last_seen', DateTime, default=datetime.utcnow)
 
 
-class AgentCapability(Base):
+class AgentCapability(db.Model):
     __tablename__ = 'agent_capabilities'
 
     agent_uuid = Column('agent_uuid', CHAR(36), ForeignKey('agents.uuid'))
@@ -26,7 +27,7 @@ class AgentCapability(Base):
     __table_args__ = (PrimaryKeyConstraint(agent_uuid, type, version),)
 
 
-class Task(Base):
+class Task(db.Model):
     __tablename__ = 'tasks'
 
     uuid = Column('uuid', CHAR(36), primary_key=True)

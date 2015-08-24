@@ -1,21 +1,13 @@
 from datetime import datetime
 import json
 
-from webtest import TestApp
-
-from slamon_afm.afm_app import app
-from slamon_afm.tables import Task
+from slamon_afm.models import db, Task
 from slamon_afm.tests.afm_test import AFMTest
-from slamon_afm.database import create_session
-from slamon_afm.routes import bpms_routes  # Shows as unused but is actually required for routes
 
 
 class TestBMPSRoutes(AFMTest):
-    @staticmethod
-    def test_post_task():
-        test_app = TestApp(app)
-
-        test_app.post_json('/task', {
+    def test_post_task(self):
+        self.test_app.post_json('/task', {
             'task_id': 'de305d54-75b4-431b-adb2-eb6b9e546013',
             'test_id': 'de305d54-75b4-431b-adb2-eb6b9e546013',
             'task_type': 'wait',
@@ -26,20 +18,17 @@ class TestBMPSRoutes(AFMTest):
         })
 
         # Test without data
-        test_app.post_json('/task', {
+        self.test_app.post_json('/task', {
             'task_id': 'de305d54-75b4-431b-adb2-eb6b9e546014',
             'test_id': 'de305d54-75b4-431b-adb2-eb6b9e546013',
             'task_type': 'wait',
             'task_version': 1
         })
 
-    @staticmethod
-    def test_post_task_invalid():
-        test_app = TestApp(app)
+    def test_post_task_invalid(self):
+        assert self.test_app.post_json('/task', expect_errors=True).status_int == 400
 
-        assert test_app.post_json('/task', expect_errors=True).status_int == 400
-
-        assert test_app.post_json('/task', {
+        assert self.test_app.post_json('/task', {
             'task_id': 'de305d54-75b4-431b-adb2-eb6b9e546013',
             'test_id': 'de305d54-75b4-431b-adb2-eb6b9e546013',
             'task_type': 'wait',
@@ -49,7 +38,7 @@ class TestBMPSRoutes(AFMTest):
             }
         }, expect_errors=True).status_int == 400
 
-        assert test_app.post_json('/task', {
+        assert self.test_app.post_json('/task', {
             'task_id': 'de305d54-75b4-431b-adb2-eb6b9e546013_not_valid',
             'test_id': 'de305d54-75b4-431b-adb2-eb6b9e546013',
             'task_type': 'wait',
@@ -59,7 +48,7 @@ class TestBMPSRoutes(AFMTest):
             }
         }, expect_errors=True).status_int == 400
 
-        assert test_app.post_json('/task', {
+        assert self.test_app.post_json('/task', {
             'test_id': 'de305d54-75b4-431b-adb2-eb6b9e546013',
             'task_type': 'wait',
             'task_version': 1,
@@ -68,38 +57,30 @@ class TestBMPSRoutes(AFMTest):
             }
         }, expect_errors=True).status_int == 400
 
-    @staticmethod
-    def test_post_task_duplicate():
-        test_app = TestApp(app)
-
-        session = create_session()
+    def test_post_task_duplicate(self):
         task1 = Task()
         task1.uuid = 'de305d54-75b4-431b-adb2-eb6b9e546018'
         task1.test_id = 'de305d54-75b4-431b-adb2-eb6b9e546018'
         task1.claimed = datetime.utcnow()
         task1.data = json.dumps({'wait_time': 123})
-        session.add(task1)
-        session.commit()
-        session.close()
+        db.session.add(task1)
+        db.session.commit()
+        db.session.close()
 
-        assert test_app.post_json('/task', {
+        assert self.test_app.post_json('/task', {
             'task_id': 'de305d54-75b4-431b-adb2-eb6b9e546018',
             'test_id': 'de305d54-75b4-431b-adb2-eb6b9e546013',
             'task_type': 'wait',
             'task_version': 1
         }, expect_errors=True).status_int == 400
 
-    @staticmethod
-    def test_pull_task():
-        test_app = TestApp(app)
-
-        session = create_session()
+    def test_pull_task(self):
         task1 = Task()
         task1.uuid = 'de305d54-75b4-431b-adb2-eb6b9e546018'
         task1.test_id = 'de305d54-75b4-431b-adb2-eb6b9e546018'
         task1.claimed = datetime.utcnow()
         task1.data = json.dumps({'wait_time': 123})
-        session.add(task1)
+        db.session.add(task1)
 
         task2 = Task()
         task2.uuid = 'de305d54-75b4-431b-adb2-eb6b9e546019'
@@ -107,7 +88,7 @@ class TestBMPSRoutes(AFMTest):
         task2.claimed = datetime.utcnow()
         task2.completed = datetime.utcnow()
         task2.result_data = json.dumps({'result': 'epic success'})
-        session.add(task2)
+        db.session.add(task2)
 
         task3 = Task()
         task3.uuid = 'de305d54-75b4-431b-adb2-eb6b9e546020'
@@ -115,16 +96,13 @@ class TestBMPSRoutes(AFMTest):
         task3.claimed = datetime.utcnow()
         task3.failed = datetime.utcnow()
         task3.error = 'unknown error'
-        session.add(task3)
+        db.session.add(task3)
 
-        session.commit()
+        db.session.commit()
 
-        test_app.get('/task/de305d54-75b4-431b-adb2-eb6b9e546018')
-        test_app.get('/task/de305d54-75b4-431b-adb2-eb6b9e546019')
-        test_app.get('/task/de305d54-75b4-431b-adb2-eb6b9e546020')
+        self.test_app.get('/task/de305d54-75b4-431b-adb2-eb6b9e546018')
+        self.test_app.get('/task/de305d54-75b4-431b-adb2-eb6b9e546019')
+        self.test_app.get('/task/de305d54-75b4-431b-adb2-eb6b9e546020')
 
-    @staticmethod
-    def test_pull_task_invalid():
-        test_app = TestApp(app)
-
-        assert test_app.get('/task/de305d54-75b4-431b-adb2-eb6b9e546013', expect_errors=True).status_int == 404
+    def test_pull_task_invalid(self):
+        assert self.test_app.get('/task/de305d54-75b4-431b-adb2-eb6b9e546013', expect_errors=True).status_int == 404

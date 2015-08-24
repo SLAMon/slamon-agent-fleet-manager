@@ -21,7 +21,7 @@ before_script:
 - psql -U postgres -c "CREATE USER afm WITH PASSWORD 'changeme';"
 - psql -U postgres -c "GRANT ALL ON DATABASE slamon TO afm;"
 - psql -U postgres -c "GRANT ALL ON DATABASE slamon_tests TO afm;"
-- python ./slamon_afm/admin.py --create-tables
+- python slamon-afm create-tables
 script:
 - nosetests --with-coverage --cover-erase --cover-package=slamon_afm
 notifications:
