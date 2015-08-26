@@ -27,6 +27,23 @@ class TestDevRoutes(AFMTest):
                         }
                     },
                     'required': ['task_id', 'task_type', 'task_version']
+                },
+            },
+            'agents': {
+                'type': 'array',
+                'items': {
+                    'type': 'object',
+                    'properties': {
+                        'agent_id': {
+                            'type': 'string',
+                            'pattern': '^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$'
+                        },
+                        'agent_name': {
+                            'type': 'string'
+                        }
+                    },
+                    'additionalProperties': True,
+                    'required': ['agent_id', 'agent_name', 'task_version']
                 }
             }
         },
@@ -35,5 +52,5 @@ class TestDevRoutes(AFMTest):
     }
 
     def test_get_tasks(self):
-        resp = self.test_app.get('/testing/tasks')
+        resp = self.test_app.get('/dashboard/status')
         jsonschema.validate(resp.json, TestDevRoutes.task_list_response_schema)

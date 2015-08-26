@@ -16,7 +16,7 @@ setup(
     license='Apache License v2.0',
     platforms=['Python 3.3+'],
     packages=find_packages(),
-    package_data={'slamon_afm.routes.testing': ['testing.html']},
+    package_data={'slamon_afm.routes': ['dashboard.html']},
     install_requires=[
         'sqlalchemy>=1.0.6, <2.0',
         'jsonschema>=2.5.1, <3.0',
