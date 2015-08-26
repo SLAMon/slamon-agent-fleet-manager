@@ -6,10 +6,9 @@ from flask import request, abort, current_app
 from flask.blueprints import Blueprint
 from flask.json import jsonify
 from sqlalchemy.orm.exc import NoResultFound
-from sqlalchemy import and_
 from dateutil import tz
 
-from slamon_afm.models import db, Agent, AgentCapability, Task
+from slamon_afm.models import db, Agent, Task
 
 blueprint = Blueprint('agent', __name__)
 
@@ -128,66 +127,37 @@ def request_tasks():
     protocol = int(data['protocol'])
     agent_uuid = str(data['agent_id'])
     agent_name = str(data['agent_name'])
-    # agent_time = data['agent_time']
     agent_capabilities = data['agent_capabilities']
     max_tasks = int(data['max_tasks'])
+    # agent_time = data['agent_time']
     # agent_location = data['agent_location'] if 'agent_location' in data else None
 
     # Only protocol 1 supported for now
     if protocol != 1:
         abort(400)
 
-    try:
-        query = db.session.query(Agent)
-        agent = query.filter(Agent.uuid == agent_uuid).one()
-
-        db.session.query(AgentCapability).filter(AgentCapability.agent_uuid == agent.uuid).delete()
-    except NoResultFound:
-        current_app.logger.debug('Registering new agent {0}'.format(agent_uuid))
-        agent = Agent(uuid=agent_uuid, name=agent_name)
-        db.session.add(agent)
-
-    for agent_capability, agent_capability_info in agent_capabilities.items():
-        capability = AgentCapability(type=agent_capability,
-                                     version=int(agent_capability_info['version']),
-                                     agent=agent)
-        db.session.add(capability)
-
-    # Find all non-claimed tasks that the agent is able to handle and assign them to the agent
-    query = db.session.query(AgentCapability, Task).filter(Task.assigned_agent_uuid.is_(None)). \
-        filter(AgentCapability.agent_uuid == agent.uuid). \
-        filter(and_(AgentCapability.type == Task.type, AgentCapability.version == Task.version))
-
-    tasks = []
-
-    # Assign available tasks to the agent and mark them as being in process
-    for _, task in query[0:max_tasks]:
-        task.assigned_agent_uuid = agent.uuid
-        task.claimed = datetime.utcnow()
-        tasks.append({
-            'task_id': task.uuid,
-            'task_type': task.type,
-            'task_version': task.version,
-            'task_data': json.loads(task.data)
-        })
-
+    # Update agent details in DB
+    agent = Agent.get_agent(agent_uuid, agent_name)
+    agent.update_capabilities(agent_capabilities)
     agent.last_seen = datetime.utcnow()
-    try:
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-        current_app.logger.error("Failed to commit database changes for task request")
-        abort(500)
 
-    current_app.logger.info("Assigning tasks {} to agent {}, {}"
-                            .format([task.id for task in tasks], agent_name, agent_uuid))
-    current_app.logger.debug("Task details: {}".format(tasks))
+    # Calculate return time for the agent (next polling time)
+    return_time = (datetime.now(tz.tzlocal()) + timedelta(0, current_app.config.get('AGENT_RETURN_TIME'))).isoformat()
 
-    return jsonify(
-        tasks=tasks,
-        return_time=(
-            datetime.now(tz.tzlocal()) + timedelta(0, current_app.config.get('AGENT_RETURN_TIME', 5))).isoformat()
-    )
+    # Claim tasks for agent
+    tasks = [{'task_id': task.uuid, 'task_type': task.type, 'task_version': task.version,
+              'task_data': json.loads(task.data)} for task in Task.claim_tasks(agent, max_tasks)]
+    if len(tasks) > 0:
+        current_app.logger.info("Assigning tasks {} to agent {}, {}"
+                                .format([task['task_id'] for task in tasks], agent_name, agent_uuid))
+        current_app.logger.debug("Task details: {}".format(tasks))
+
+    response = jsonify(tasks=tasks, return_time=return_time)
+
+    # commit only after serializing the response
+    db.session.commit()
+
+    return response
 
 
 @blueprint.route('/tasks/response', methods=['POST'], strict_slashes=False)

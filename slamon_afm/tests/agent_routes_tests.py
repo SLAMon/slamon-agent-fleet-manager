@@ -35,15 +35,16 @@ class TestPolling(AFMTest):
         'additionalProperties': False
     }
 
-    def test_poll_tasks_non_json(self):
+    def test_poll_tasks_non_json_request(self):
         """Test a non-JSON request"""
         assert self.test_app.post('/tasks', expect_errors=True).status_int == 400
 
-    def test_poll_tasks_empty(self):
+    def test_poll_tasks_empty_request(self):
         assert self.test_app.post_json('/tasks', {}, expect_errors=True).status_int == 400
         assert self.test_app.post_json('/tasks/', {}, expect_errors=True).status_int == 400
 
-    def test_poll_tasks(self):
+    def test_poll_tasks_empty(self):
+        """Test if task polling behaves when no tasks are available."""
         resp = self.test_app.post_json('/tasks', {
             'protocol': 1,
             'agent_id': 'de305d54-75b4-431b-adb2-eb6b9e546013',
@@ -59,13 +60,29 @@ class TestPolling(AFMTest):
             },
             'max_tasks': 5
         })
-
         jsonschema.validate(resp.json, TestPolling.task_request_response_schema)
+        self.assertEqual(len(resp.json['tasks']), 0)
 
-        self.test_app.post_json('/tasks', {
+    def test_poll_tasks_claim_one(self):
+        """Test if task is correctly claimed."""
+
+        task = Task()
+        task.uuid = 'de305d54-75b4-431b-adb2-eb6b9e546013'
+        task.test_id = 'de305d54-75b4-431b-adb2-eb6b9e546013'
+        task.type = 'task-type-1'
+        task.version = 1
+        task.data = "{}"
+        db.session.add(task)
+        db.session.commit()
+
+        resp = self.test_app.post_json('/tasks', {
             'protocol': 1,
             'agent_id': 'de305d54-75b4-431b-adb2-eb6b9e546013',
             'agent_name': 'Agent 007',
+            'agent_location': {
+                'country': 'FI',
+                'region': '18'
+            },
             'agent_time': '2012-04-23T18:25:43.511Z',
             'agent_capabilities': {
                 'task-type-1': {'version': 1},
@@ -73,6 +90,8 @@ class TestPolling(AFMTest):
             },
             'max_tasks': 5
         })
+        jsonschema.validate(resp.json, TestPolling.task_request_response_schema)
+        self.assertEqual(len(resp.json['tasks']), 1)
 
     def test_poll_task_capability_change(self):
         self.test_app.post_json('/tasks', {
@@ -91,6 +110,9 @@ class TestPolling(AFMTest):
             'max_tasks': 5
         })
 
+        agent = db.session.query(Agent).filter(Agent.uuid == 'de305d54-75b4-431b-adb2-eb6b9e546013').one()
+        self.assertEqual(len(agent.capabilities), 2)
+
         self.test_app.post_json('/tasks', {
             'protocol': 1,
             'agent_id': 'de305d54-75b4-431b-adb2-eb6b9e546013',
@@ -101,8 +123,7 @@ class TestPolling(AFMTest):
             },
             'agent_time': '2012-04-23T18:25:43.511Z',
             'agent_capabilities': {
-                'task-type-1': {'version': 1},
-                'task-type-2': {'version': 2},
+                'task-type-1': {'version': 2},
                 'task-type-3': {'version': 3},
                 'task-type-4': {'version': 4}
             },
@@ -110,15 +131,14 @@ class TestPolling(AFMTest):
         })
 
         agent = db.session.query(Agent).filter(Agent.uuid == 'de305d54-75b4-431b-adb2-eb6b9e546013').one()
+        self.assertEqual(len(agent.capabilities), 3)
 
-        db.session.query(AgentCapability).filter(AgentCapability.agent_uuid == agent.uuid). \
-            filter(AgentCapability.type == 'task-type-1').one()
-        db.session.query(AgentCapability).filter(AgentCapability.agent_uuid == agent.uuid). \
-            filter(AgentCapability.type == 'task-type-2').one()
-        db.session.query(AgentCapability).filter(AgentCapability.agent_uuid == agent.uuid). \
-            filter(AgentCapability.type == 'task-type-3').one()
-        db.session.query(AgentCapability).filter(AgentCapability.agent_uuid == agent.uuid). \
-            filter(AgentCapability.type == 'task-type-4').one()
+        self.assertEqual(db.session.query(AgentCapability).filter(AgentCapability.agent_uuid == agent.uuid). \
+                         filter(AgentCapability.type == 'task-type-1').one().version, 2)
+        self.assertEqual(db.session.query(AgentCapability).filter(AgentCapability.agent_uuid == agent.uuid). \
+                         filter(AgentCapability.type == 'task-type-3').one().version, 3)
+        self.assertEqual(db.session.query(AgentCapability).filter(AgentCapability.agent_uuid == agent.uuid). \
+                         filter(AgentCapability.type == 'task-type-4').one().version, 4)
 
     def test_poll_tasks_invalid_data(self):
         # Invalid protocol
