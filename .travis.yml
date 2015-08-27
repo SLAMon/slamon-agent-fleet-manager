@@ -12,16 +12,6 @@ cache:
 install:
 - pip install -r test_requirements.txt
 - pip install .
-before_script:
-- psql -U postgres -c "DROP DATABASE IF EXISTS slamon;"
-- psql -U postgres -c "DROP DATABASE IF EXISTS slamon_tests;"
-- psql -U postgres -c "DROP USER IF EXISTS afm;"
-- psql -U postgres -c "CREATE DATABASE slamon;"
-- psql -U postgres -c "CREATE DATABASE slamon_tests;"
-- psql -U postgres -c "CREATE USER afm WITH PASSWORD 'changeme';"
-- psql -U postgres -c "GRANT ALL ON DATABASE slamon TO afm;"
-- psql -U postgres -c "GRANT ALL ON DATABASE slamon_tests TO afm;"
-- python slamon-afm create-tables
 script:
 - nosetests --with-coverage --cover-erase --cover-package=slamon_afm
 notifications:
