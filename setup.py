@@ -6,7 +6,6 @@ short_description = 'SLAMon Agent Fleet Manager is part of the Coordinator, whic
                     'them tasks and receiving the results. The results are then propagated to e.g. a business process ' \
                     'management system (BPMS).'
 
-
 setup(
     name='slamon-afm',
     version='1.0.0',
@@ -17,16 +16,17 @@ setup(
     license='Apache License v2.0',
     platforms=['Python 3.3+'],
     packages=find_packages(),
-    package_data={'slamon_afm.routes.testing': ['testing.html']},
+    package_data={'slamon_afm.routes': ['dashboard.html']},
     install_requires=[
-        'bottle>=0.12.8, <1.0',
         'sqlalchemy>=1.0.6, <2.0',
         'jsonschema>=2.5.1, <3.0',
-        'python_dateutil>= 2.4.2, <3.0'
+        'python_dateutil>= 2.4.2, <3.0',
+        'flask>=0.10',
+        'flask-sqlalchemy>=2.0'
     ],
     entry_points={
         'console_scripts': [
-            'slamon-afm = slamon_afm.afm:main'
+            'slamon-afm = slamon_afm.cli:main'
         ]
     },
     classifiers=[

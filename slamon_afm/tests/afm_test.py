@@ -1,20 +1,29 @@
-from slamon_afm.database import Base, init_connection, engine
-from slamon_afm.tables import Agent, AgentCapability, Task
+from unittest import TestCase
+import logging
+
+from webtest import TestApp
+
+from slamon_afm.app import create_app
+from slamon_afm.models import db
 
 
-class AFMTest(object):
-    @classmethod
-    def create_tables(cls):
-        Base.metadata.create_all(engine)
+# Log everything during tests
+logging.basicConfig(level=logging.DEBUG)
 
-    @classmethod
-    def drop_tables(cls):
-        Base.metadata.drop_all(engine)
 
-    def setup(self):
-        init_connection(unittest=True)
+class AFMTest(TestCase):
+    AFM_CONFIG = {
+        'SQLALCHEMY_DATABASE_URI': 'sqlite://'
+    }
 
-        self.create_tables()
+    def setUp(self):
+        self.app = create_app(config=self.AFM_CONFIG)
+        self.app_context = self.app.app_context()
+        self.app_context.push()
+        db.create_all()
 
-    def teardown(self):
-        self.drop_tables()
+        self.test_app = TestApp(self.app)
+
+    def tearDown(self):
+        db.drop_all()
+        self.app_context.pop()

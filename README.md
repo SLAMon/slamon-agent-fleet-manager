@@ -13,20 +13,50 @@ SLAMon Agent Fleet Manager (AFM)
 
 
 # Requirements
+
 * python 3.3+
+* sqlalchemy>=1.0.6
+* jsonschema>=2.5.1
+* python_dateutil>= 2.4.2
+* flask>=0.10
+* flask-sqlalchemy>=2.0
 
-# Setting up
-File slamon_afm/settings.py contains AFM settings in following format:
+# Installation
+
+Easiest way to install SLAMon Agent Fleet Manager is using pip, this will also take care of the dependencies:
+
 ```
-class Settings:
-    port = 8080  # Port for the server
-
-    database_name = 'slamon'  # Name of the psql database
-    database_user = 'afm'  # Username to use for psql connection
-    database_password = 'changeme'  # Password to use for psql connection
+pip install slamon-afm
 ```
 
-## Creating postgresql database
+# Configuration
+
+By default, SLAMon AFM will try to lookup configuration file location in the *SLAMON_AFM_CFG* environment variable.
+Alternatively, you can specify the configuration file path or override the database URI on command line:
+
+```
+  --database-uri DATABASE_URI
+                        Set the AFM database URI, defaults to in memory sqlite
+  --config CONFIG, -c CONFIG
+                        Load AFM configuration from a file
+```
+
+## Configuration keys
+
+SLAMon AFM usess the configuration utilities provided by Flask. In addition to SLAMon AFM specific configuration keys,
+you can tune the generic [Flask](http://flask.pocoo.org/docs/0.10/config/#builtin-configuration-values) and
+[Flask-SQLAlchemy](https://pythonhosted.org/Flask-SQLAlchemy/config.html#configuration-keys) configuration keys using
+the same configuration file. 
+
+Key                       | Description
+--------------------------|----------------------------
+SQLALCHEMY_DATABASE_URI   | The database URI that should be used for the connection. default='sqlite://'
+AGENT_RETURN_TIME         | Default polling interval for agents, defined in seconds. default=60
+AGENT_ACTIVE_THRESHOLD    | Timeout to wait before considering an agent as lost, defined in seconds. default=300
+AUTO_CREATE               | Automatically create database tables before the first request. default=True
+
+## Creating a PostgreSQL database for AFM
+
 ```
 psql
 postgres=# CREATE DATABASE slamon;
@@ -38,44 +68,59 @@ postgres=# GRANT ALL PRIVILEGES ON DATABASE slamon_tests TO afm;
 ```
 
 To create needed tables:
+
 ```
-slamon-afm create-tables
+slamon-afm --database-uri="postgresql+psycopg2://user:pass@host/db" create-tables
 ```
 
 To delete tables:
-```
-slamon-afm drop-tables
-```
 
-## Creating python virtualenv and installing Agent Fleet Manager
 ```
-pip install slamon-afm
+slamon-afm --database-uri="postgresql+psycopg2://user:pass@host/db" drop-tables
 ```
 
 # Running
-## Running afm
+
 Running an instance of AFM from commandline
+
 ```
-slamon-afm run HOST_NAME
-```
-For example running AFM on localhost
-```
-slamon-afm run localhost
+usage: slamon-afm run [-h] host port
+
+Run an instance of an Agent Fleet Manager that listens to given host address
+
+positional arguments:
+  host        Host name or address e.g. localhost or 127.0.0.1
+  port        Listening port, defaults to 8080
 ```
 
-### Running tests
-$SLAMON_ROOT refers to the repository root.
+For example running AFM listening for all interfaces on port 8080:
+
 ```
-cd $SLAMON_ROOT
+slamon-afm run 0.0.0.0 8080
+```
+
+# Running the tests
+
+Running the tests with nose:
+
+```
 pip install -r test_requirements.txt
 nosetests
 ```
-or (if coverage report is also wanted)
+
+or with coverage report:
+
 ```
-cd $SLAMON_ROOT
-pip install -r test_requirements.txt
 nosetests --with-coverage --cover-package=slamon_afm
 ```
+
+# Things to do
+
+* Separate application logic from routes into smaller functions
+    * proper unittests for these
+* Mock database usage in tests
+* Extend the BPMS API with task TTL support
+
 
 [license]: https://img.shields.io/:license-Apache%20License%20v2.0-blue.svg
 [requirements_image]: https://requires.io/github/SLAMon/slamon-agent-fleet-manager/requirements.svg?branch=master

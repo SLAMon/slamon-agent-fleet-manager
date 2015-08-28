@@ -1,15 +1,15 @@
 from datetime import datetime, timedelta
 
-from bottle import HTTPError
+from flask.blueprints import Blueprint
+from flask import abort, current_app
+from flask.json import jsonify
 
-from slamon_afm.afm_app import app
-from slamon_afm.database import create_session
-from slamon_afm.tables import Agent, Task
-from slamon_afm.settings import Settings
+from slamon_afm.models import db, Agent, Task
+
+blueprint = Blueprint('status', __name__)
 
 
-@app.get('/status')
-@app.get('/status/')
+@blueprint.route('/status', methods=['GET'], strict_slashes=False)
 def status():
     """
     Simple status page which verifies that database connectivity works and tells stats about pending tasks and active
@@ -20,19 +20,12 @@ def status():
         'tasks_waiting': 10 # Number of tasks that haven't been claimed yet
     }
     """
-    try:
-        session = create_session()
-    except:
-        raise HTTPError(500, 'Something wen\'t wrong with database session')
 
-    agent_time_threshold = datetime.utcnow() - timedelta(0, Settings.agent_active_threshold)
+    agent_time_threshold = datetime.utcnow() - timedelta(0, current_app.config['AGENT_ACTIVE_THRESHOLD'])
 
     try:
-        num_agents = session.query(Agent).filter(Agent.last_seen > agent_time_threshold).count()
-        tasks_waiting = session.query(Task).filter(Task.claimed is None).count()
+        num_agents = db.session.query(Agent).filter(Agent.last_seen > agent_time_threshold).count()
+        tasks_waiting = db.session.query(Task).filter(Task.claimed is None).count()
+        return jsonify(agents=num_agents, tasks_waiting=tasks_waiting)
     except Exception as e:
-        raise HTTPError(500, 'Failed to query tasks and agents ' + str(e))
-    finally:
-        session.close()
-
-    return {'agents': num_agents, 'tasks_waiting': tasks_waiting}
+        abort(500, 'Failed to query tasks and agents ' + str(e))
