@@ -15,7 +15,7 @@ SLAMon Agent Fleet Manager (AFM)
 # Requirements
 
 * python 3.3+
-* qlalchemy>=1.0.6,
+* sqlalchemy>=1.0.6
 * jsonschema>=2.5.1
 * python_dateutil>= 2.4.2
 * flask>=0.10
