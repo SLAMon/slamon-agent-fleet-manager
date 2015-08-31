@@ -12,7 +12,7 @@ SLAMon Agent Fleet Manager (AFM)
 [![Code Health][health]](https://landscape.io/github/SLAMon/slamon-agent-fleet-manager/master)
 
 
-# Requirements
+## Requirements
 
 * python 3.3+
 * sqlalchemy>=1.0.6
@@ -21,7 +21,7 @@ SLAMon Agent Fleet Manager (AFM)
 * flask>=0.10
 * flask-sqlalchemy>=2.0
 
-# Installation
+## Installation
 
 Easiest way to install SLAMon Agent Fleet Manager is using pip, this will also take care of the dependencies:
 
@@ -29,7 +29,7 @@ Easiest way to install SLAMon Agent Fleet Manager is using pip, this will also t
 pip install slamon-afm
 ```
 
-# Configuration
+## Configuration
 
 By default, SLAMon AFM will try to lookup configuration file location in the *SLAMON_AFM_CFG* environment variable.
 Alternatively, you can specify the configuration file path or override the database URI on command line:
@@ -41,7 +41,7 @@ Alternatively, you can specify the configuration file path or override the datab
                         Load AFM configuration from a file
 ```
 
-## Configuration keys
+### Configuration keys
 
 SLAMon AFM usess the configuration utilities provided by Flask. In addition to SLAMon AFM specific configuration keys,
 you can tune the generic [Flask](http://flask.pocoo.org/docs/0.10/config/#builtin-configuration-values) and
@@ -55,7 +55,7 @@ AGENT_RETURN_TIME         | Default polling interval for agents, defined in seco
 AGENT_ACTIVE_THRESHOLD    | Timeout to wait before considering an agent as lost, defined in seconds. default=300
 AUTO_CREATE               | Automatically create database tables before the first request. default=True
 
-## Creating a PostgreSQL database for AFM
+### Creating a PostgreSQL database for AFM
 
 ```
 psql
@@ -79,7 +79,7 @@ To delete tables:
 slamon-afm --database-uri="postgresql+psycopg2://user:pass@host/db" drop-tables
 ```
 
-# Running
+## Running
 
 Running an instance of AFM from commandline
 
@@ -99,7 +99,7 @@ For example running AFM listening for all interfaces on port 8080:
 slamon-afm run 0.0.0.0 8080
 ```
 
-# Running the tests
+## Running the tests
 
 Running the tests with nose:
 
@@ -114,7 +114,39 @@ or with coverage report:
 nosetests --with-coverage --cover-package=slamon_afm
 ```
 
-# Things to do
+## Docker images
+
+Pre-existing images are built from `master` and `dev` branches:
+`slamon/afm:stable` and `slamon/afm:latest` respectively, and also
+from GitHub tags as `slamon/afm:<tag>`.
+
+### Using the images
+
+The default entrypoint in the image will start AFM listening for 0.0.0.0:8080
+with database URI read from `AFM_DB_URI` environment variable, which is set to
+in memory SQLite database by default.
+
+To override default configuration, extend the image with our configuration file
+and override the default `CMD` in the Dockerfile.
+
+#### With Docker Compose
+
+The following snippet can be used, combining an agent and the AFM:
+
+```yml
+afm:
+  image: slamon/afm:stable
+agent:
+  image: slamon/agent:stable
+  environment:
+    AFM: "http://slamon-afm:8080"
+    HANDLERS: "slamon_agent.handlers"
+    EXTRA_FLAGS: "-v"
+  links:
+   - afm:slamon-afm
+```
+
+## Things to do
 
 * Separate application logic from routes into smaller functions
     * proper unittests for these
