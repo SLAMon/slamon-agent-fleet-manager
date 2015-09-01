@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from setuptools import find_packages, setup
+from setuptools import setup, find_packages
 
 short_description = 'SLAMon Agent Fleet Manager is part of the Coordinator, which controls deployed agents by giving ' \
                     'them tasks and receiving the results. The results are then propagated to e.g. a business process ' \
@@ -8,7 +8,7 @@ short_description = 'SLAMon Agent Fleet Manager is part of the Coordinator, whic
 
 setup(
     name='slamon-afm',
-    version='1.0.0',
+    version='1.1.0',
     description=short_description,
     url='https://github.com/SLAMon/slamon-agent-fleet-manager',
     author='SLAMon',
