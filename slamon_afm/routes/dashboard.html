@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>SLAMon AFM Dashboard</title>
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css"/>
+	<style>
+		.row-enter {
+			opacity: 0.01;
+			overflow: hidden;
+		}
+
+		.row-enter.row-enter-active {
+			opacity: 1;
+			transition: opacity .5s ease-in;
+		}
+
+		.row-leave {
+			opacity: 1;
+		}
+
+		.row-leave.row-leave-active {
+			opacity: 0.01;
+			transition: opacity .5s ease-in;
+		}
+
+		tr, td {
+			transition: background-color .5s ease-in;
+		}
+	</style>
+</head>
+<body>
+<div class="container">
+	<h1>SLAMon AFM Status</h1>
+
+	<div class="row">
+		<div id="status" class="col-md-8"></div>
+		<div class="col-md-4">
+			<div class="panel panel-default">
+				<div class="panel-heading">Add a task
+				</div>
+				<div class="panel-body">
+					<form class="form-horizontal" id="task_form">
+
+						<div class="form-group">
+							<label for="task_id" class="col-sm-2 control-label">task_id</label>
+
+							<div class="col-sm-10">
+								<input type="text" class="form-control" value="de305d54-75b4-431b-adb2-eb6b9e546013"
+									   id="task_id"/>
+							</div>
+						</div>
+						<div class="form-group">
+							<label for="test_id" class="col-sm-2 control-label">test_id</label>
+
+							<div class="col-sm-10">
+								<input type="text" class="form-control" value="de305d54-75b4-431b-adb2-eb6b9e546013"
+									   id="test_id"/>
+							</div>
+						</div>
+						<div class="form-group">
+							<label for="task_type" class="col-sm-2 control-label">task_type</label>
+
+							<div class="col-sm-10">
+								<input type="text" class="form-control" value="wait" id="task_type"/>
+							</div>
+						</div>
+						<div class="form-group">
+							<label for="task_version" class="col-sm-2 control-label">task_version</label>
+
+							<div class="col-sm-10">
+								<input type="text" class="form-control" value="1" id="task_version"/>
+							</div>
+						</div>
+						<div class="form-group">
+							<label for="task_data" class="col-sm-2 control-label">task_data</label>
+
+							<div class="col-sm-10">
+								<textarea class="form-control" id="task_data">{}</textarea>
+							</div>
+						</div>
+
+						<div class="form-group">
+							<div class="col-sm-offset-2 col-sm-10">
+
+								<input type="submit" id="task_submit" class="btn btn-default" value="Submit"/>
+							</div>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+	</div>
+
+</div>
+
+
+<script src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+<script src="https://fb.me/react-with-addons-0.13.3.min.js"></script>
+<script src="https://fb.me/JSXTransformer-0.13.3.js"></script>
+<script type="text/jsx">
+	var ReactCSSTransitionGroup = React.addons.CSSTransitionGroup;
+
+	var Task = React.createClass({
+		_getClass: function () {
+			if (this.props.task.task_completed) {
+				return "success";
+			} else if (this.props.task.task_failed) {
+				return "danger";
+			}
+			return "";
+		},
+		_resultContent: function () {
+			return '<p><b>Completion</b><br/>' + (this.props.task.task_completed || this.props.task.task_failed) + '</p>' +
+					'<p><b>Test</b><br/>' + (this.props.task.test_id) + '</p>' +
+					'<p><b>Result</b><pre>' + (this.props.task.task_result || this.props.task.task_error) + '</pre></p>';
+		},
+		componentDidMount: function () {
+			$(React.findDOMNode(this)).popover({trigger: 'hover', html: true});
+		},
+		render: function () {
+			return (
+					<tr className={this._getClass()}
+						data-placement="bottom"
+						data-toggle="popover"
+						title="Task result"
+						data-content={this._resultContent()}>
+						<td>{this.props.task.task_type} ({this.props.task.task_version})</td>
+						<td>{this.props.task.task_id}</td>
+					</tr>
+			);
+		}
+	});
+
+	var TaskList = React.createClass({
+		render: function () {
+			return (
+					<table className="table">
+						<thead>
+							<th>Task</th>
+							<th>Task ID</th>
+						</thead>
+						<ReactCSSTransitionGroup component="tbody" transitionName="row">
+							{this.props.tasks.map(function (task, i) {
+								return (<Task key={task.agent_id} task={task}> {task}</Task>);
+							}.bind(this))}
+						</ReactCSSTransitionGroup>
+					</table>
+			);
+		}
+	});
+
+	var Agent = React.createClass({
+		render: function () {
+			return (
+					<div className="panel panel-default">
+						<div className="panel-heading">{this.props.agent.agent_name} ({this.props.agent.agent_id})</div>
+						<TaskList tasks={this.props.agent.tasks}/>
+					</div>
+			);
+		}
+	});
+
+	var AgentList = React.createClass({
+		render: function () {
+			return (
+					<div>
+						<ReactCSSTransitionGroup component="div" transitionName="row">
+							{this.props.agents.map(function (agent, i) {
+								return (<Agent key={agent.agent_id} agent={agent}> {agent}</Agent>);
+							}.bind(this))}
+						</ReactCSSTransitionGroup>
+					</div>
+			);
+		}
+	});
+
+	var Status = React.createClass({
+		componentDidMount: function () {
+			console.log('Loading data from %s', this.props.source);
+			setInterval(function () {
+				$.getJSON(this.props.source).success(function (json) {
+					this.setState(json);
+				}.bind(this));
+			}.bind(this), 1000);
+
+		},
+		getInitialState: function () {
+			return {tasks: [], agents: []};
+		},
+		render: function () {
+			return (
+					<div className="row">
+						<div className="col-md-6">
+							<div className="panel panel-default">
+								<div className="panel-heading">Pending tasks</div>
+								<TaskList tasks={this.state.tasks}></TaskList>
+							</div>
+						</div>
+						<div className="col-md-6">
+							<AgentList agents={this.state.agents}></AgentList>
+						</div>
+					</div>
+			);
+		}
+	});
+
+	React.render(<Status source="/dashboard/status"/>, $("#status")[0]);
+
+	$("#task_form").submit(function (e) {
+		e.stopPropagation();
+		var values = {
+			'task_id': $("#task_id").val(),
+			'test_id': $("#test_id").val(),
+			'task_type': $("#task_type").val(),
+			'task_version': parseInt($("#task_version").val()),
+			'task_data': JSON.parse($("#task_data").val())
+		};
+		$("#task_form .form-group").removeClass('has-error');
+		$("#task_form input,textarea").attr('disabled', true);
+		console.log(values);
+		$.ajax('/task', {
+			data: JSON.stringify(values),
+			contentType: 'application/json',
+			type: 'POST'
+		}).done(function () {
+			$("#task_form input,textarea").attr('disabled', false);
+		}).error(function () {
+			$("#task_form input,textarea").attr('disabled', false);
+			$("#task_form .form-group").addClass('has-error');
+		});
+		return false;
+	});
+</script>
+
+</body>
+</html>

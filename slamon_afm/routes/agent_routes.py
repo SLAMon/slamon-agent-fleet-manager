@@ -1,21 +1,18 @@
 from datetime import datetime, timedelta
 import json
 
-from bottle import request, HTTPError
-from sqlalchemy.orm.exc import NoResultFound
-from sqlalchemy import and_
-from dateutil import tz
 import jsonschema
+from flask import request, abort, current_app
+from flask.blueprints import Blueprint
+from flask.json import jsonify
+from sqlalchemy.orm.exc import NoResultFound
+from dateutil import tz
 
-from slamon_afm.tables import Agent, AgentCapability, Task
-from slamon_afm.afm_app import app
-from slamon_afm.database import create_session
-from slamon_afm.settings import Settings
-from slamon_afm.slamon_logging import getSLAMonLogger
+from slamon_afm.models import db, Agent, Task
 
-logger = getSLAMonLogger(__name__)
+blueprint = Blueprint('agent', __name__)
 
-task_request_schema = {
+TASK_REQUEST_SCHEMA = {
     'type': 'object',
     'properties': {
         'protocol': {
@@ -72,91 +69,7 @@ task_request_schema = {
     'additionalProperties': False
 }
 
-
-@app.post('/tasks')
-@app.post('/tasks/')
-def request_tasks():
-    data = request.json
-
-    if data is None:
-        raise HTTPError(400)
-
-    try:
-        jsonschema.validate(data, task_request_schema)
-    except jsonschema.ValidationError:
-        raise HTTPError(400)
-
-    protocol = int(data['protocol'])
-    agent_uuid = str(data['agent_id'])
-    agent_name = str(data['agent_name'])
-    agent_time = data['agent_time']
-    agent_capabilities = data['agent_capabilities']
-    max_tasks = int(data['max_tasks'])
-    agent_location = data['agent_location'] if 'agent_location' in data else None
-
-    # Only protocol 1 supported for now
-    if protocol != 1:
-        raise HTTPError(400)
-
-    try:
-        session = create_session()
-    except:
-        logger.error("Failed to create database session for task request")
-        raise HTTPError(500)
-
-    try:
-        query = session.query(Agent)
-        agent = query.filter(Agent.uuid == agent_uuid).one()
-
-        session.query(AgentCapability).filter(AgentCapability.agent_uuid == agent.uuid).delete()
-    except NoResultFound:
-        agent = Agent(uuid=agent_uuid, name=agent_name)
-        session.add(agent)
-
-    for agent_capability, agent_capability_info in agent_capabilities.items():
-        capability = AgentCapability(type=agent_capability,
-                                     version=int(agent_capability_info['version']),
-                                     agent=agent)
-        session.add(capability)
-
-    # Find all non-claimed tasks that the agent is able to handle and assign them to the agent
-    query = session.query(AgentCapability, Task).filter(Task.assigned_agent_uuid.is_(None)).\
-        filter(AgentCapability.agent_uuid == agent.uuid).\
-        filter(and_(AgentCapability.type == Task.type, AgentCapability.version == Task.version))
-
-    tasks = []
-
-    # Assign available tasks to the agent and mark them as being in process
-    for _, task in query[0:max_tasks]:
-        task.assigned_agent_uuid = agent.uuid
-        task.claimed = datetime.utcnow()
-        tasks.append({
-            'task_id': task.uuid,
-            'task_type': task.type,
-            'task_version': task.version,
-            'task_data': json.loads(task.data)
-        })
-
-    agent.last_seen = datetime.utcnow()
-    try:
-        session.commit()
-    except Exception:
-        session.rollback()
-        logger.error("Failed to commit database changes for task request")
-        raise HTTPError(500)
-    finally:
-        session.close()
-
-    logger.info("Agent requested tasks - Agent's name and uuid: {}, {} - Agent was given following tasks: {}"
-                .format(agent_name, agent_uuid, tasks))
-
-    return {
-        "tasks": tasks,
-        "return_time": (datetime.now(tz.tzlocal()) + timedelta(0, Settings.agent_return_time)).isoformat()
-    }
-
-
-task_response_schema = {
+TASK_RESPONSE_SCHEMA = {
     'type': 'object',
     'oneOf': [
         {
@@ -197,42 +110,84 @@ task_response_schema = {
 }
 
 
-@app.post('/tasks/response')
-@app.post('/tasks/response/')
+@blueprint.route('/tasks', methods=['POST'], strict_slashes=False)
+def request_tasks():
+    data = request.json
+
+    if data is None:
+        current_app.logger.error('No JSON data provided with request.')
+        abort(400)
+
+    try:
+        jsonschema.validate(data, TASK_REQUEST_SCHEMA)
+    except jsonschema.ValidationError:
+        current_app.logger.error('Invalid JSON data provided with request.')
+        abort(400)
+
+    protocol = int(data['protocol'])
+    agent_uuid = str(data['agent_id'])
+    agent_name = str(data['agent_name'])
+    agent_capabilities = data['agent_capabilities']
+    max_tasks = int(data['max_tasks'])
+    # agent_time = data['agent_time']
+    # agent_location = data['agent_location'] if 'agent_location' in data else None
+
+    # Only protocol 1 supported for now
+    if protocol != 1:
+        abort(400)
+
+    # Update agent details in DB
+    agent = Agent.get_agent(agent_uuid, agent_name)
+    agent.update_capabilities(agent_capabilities)
+    agent.last_seen = datetime.utcnow()
+
+    # Calculate return time for the agent (next polling time)
+    return_time = (datetime.now(tz.tzlocal()) + timedelta(0, current_app.config.get('AGENT_RETURN_TIME'))).isoformat()
+
+    # Claim tasks for agent
+    tasks = [{'task_id': task.uuid, 'task_type': task.type, 'task_version': task.version,
+              'task_data': json.loads(task.data)} for task in Task.claim_tasks(agent, max_tasks)]
+    if len(tasks) > 0:
+        current_app.logger.info("Assigning tasks {} to agent {}, {}"
+                                .format([task['task_id'] for task in tasks], agent_name, agent_uuid))
+        current_app.logger.debug("Task details: {}".format(tasks))
+
+    response = jsonify(tasks=tasks, return_time=return_time)
+
+    # commit only after serializing the response
+    db.session.commit()
+
+    return response
+
+
+@blueprint.route('/tasks/response', methods=['POST'], strict_slashes=False)
 def post_tasks():
     data = request.json
 
     if data is None:
-        logger.error("No JSON content in task response request!")
-        raise HTTPError(400)
+        current_app.logger.error("No JSON content in task response request!")
+        abort(400)
 
     try:
-        jsonschema.validate(data, task_response_schema)
+        jsonschema.validate(data, TASK_RESPONSE_SCHEMA)
     except jsonschema.ValidationError as e:
-        logger.error("Invalid JSON in task reponse: {0}".format(e))
-        raise HTTPError(400)
+        current_app.logger.error("Invalid JSON in task reponse: {0}".format(e))
+        abort(400)
 
     protocol = int(data['protocol'])
     task_id = str(data['task_id'])
 
     # Only protocol 1 supported for now
     if protocol != 1:
-        logger.error("Invalid protocol in task response: {0}".format(protocol))
-        raise HTTPError(400)
+        current_app.logger.error("Invalid protocol in task response: {0}".format(protocol))
+        abort(400)
 
     try:
-        session = create_session()
-    except:
-        logger.error("Failed to create database session for task result POST")
-        raise HTTPError(500)
-
-    try:
-        task = session.query(Task).filter(Task.uuid == str(task_id)).one()
+        task = db.session.query(Task).filter(Task.uuid == str(task_id)).one()
 
         if task.claimed is None or (task.completed is not None or task.failed is not None):
-            logger.error("Incomplete task posted!")
-            session.close()
-            raise HTTPError(400)
+            current_app.logger.error("Incomplete task posted!")
+            abort(400)
 
         result = ""
         if 'task_data' in data:
@@ -244,19 +199,19 @@ def post_tasks():
             task.failed = datetime.utcnow()
             result = task.error
 
-        session.add(task)
+        db.session.add(task)
     except NoResultFound:
-        logger.error("No matching task in for task response!")
-        session.close()
-        raise HTTPError(400)
+        current_app.logger.error("No matching task in for task response!")
+        abort(400)
 
     try:
-        session.commit()
+        db.session.commit()
     except Exception:
-        session.rollback()
-        logger.error("Failed to commit database changes for task result POST")
-        raise HTTPError(500)
-    finally:
-        session.close()
+        db.session.rollback()
+        current_app.logger.error("Failed to commit database changes for task result POST")
+        abort(500)
 
-    logger.info("An agent returned task with results - uuid: {}, end results: {}".format(task_id, result))
+    current_app.logger.info("An agent returned task with results - uuid: {}".format(task_id))
+    current_app.logger.debug("Task results: {}".format(result))
+
+    return ('', 200)
