@@ -54,6 +54,10 @@ SQLALCHEMY_DATABASE_URI   | The database URI that should be used for the connect
 AGENT_RETURN_TIME         | Default polling interval for agents, defined in seconds. default=60
 AGENT_ACTIVE_THRESHOLD    | Timeout to wait before considering an agent as lost, defined in seconds. default=300
 AUTO_CREATE               | Automatically create database tables before the first request. default=True
+LOG_FILE                  | Output log to a file instead of stderr. default=None
+LOG_LEVEL                 | Output log level. default=logging.DEBUG
+LOG_FORMAT                | Output log format. default=`'%(asctime)s - %(name)s - %(levelname)s - %(message).120s'`
+
 
 ### Creating a PostgreSQL database for AFM
 
