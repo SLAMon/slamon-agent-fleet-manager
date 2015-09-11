@@ -68,20 +68,20 @@ def create_app(config=None, config_file=None):
     app.logger.setLevel(app.config['LOG_LEVEL'])
     app.logger.addHandler(handler)
 
+    # register app for Flask-SQLAlchemy DB
+    db.init_app(app)
+
     # register app routes
     app.register_blueprint(agent_routes.blueprint)
     app.register_blueprint(bpms_routes.blueprint)
     app.register_blueprint(status_routes.blueprint)
-    app.register_blueprint(dashboard_routes.blueprint)
+    dashboard_routes.register_blueprints(app)
 
     # set to auto create tables before first request
     if app.config['AUTO_CREATE']:
         @app.before_first_request
         def create_database():
             db.create_all()
-
-    # register app for Flask-SQLAlchemy DB
-    db.init_app(app)
 
     # register event listener to enable foreign_keys for SQLite databases
     def on_connect(conn, record):

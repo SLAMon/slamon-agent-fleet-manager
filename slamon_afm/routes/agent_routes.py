@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-import json
 
 import jsonschema
 from flask import request, abort, current_app
@@ -157,7 +156,7 @@ def request_tasks():
 
     # Claim tasks for agent
     tasks = [{'task_id': task.uuid, 'task_type': task.type, 'task_version': task.version,
-              'task_data': json.loads(task.data)} for task in Task.claim_tasks(agent, max_tasks)]
+              'task_data': task.data} for task in Task.claim_tasks(agent, max_tasks)]
     if len(tasks) > 0:
         current_app.logger.info("Assigning tasks {} to agent {}, {}"
                                 .format([task['task_id'] for task in tasks], agent_name, agent_uuid))
@@ -182,7 +181,7 @@ def post_tasks():
     try:
         jsonschema.validate(data, TASK_RESPONSE_SCHEMA)
     except jsonschema.ValidationError as e:
-        current_app.logger.error("Invalid JSON in task reponse: {0}".format(e))
+        current_app.logger.error("Invalid JSON in task response: {0}".format(e))
         abort(400)
 
     protocol = int(data['protocol'])
@@ -202,9 +201,9 @@ def post_tasks():
             abort(400)
 
         if 'task_data' in data:
-            task.result_data = json.dumps(data['task_data'])
+            task.result_data = data['task_data']
             task.completed = datetime.utcnow()
-            result = json.dumps(task.result_data)
+            result = task.result_data
         elif 'task_error' in data:
             task.error = data['task_error']
             task.failed = datetime.utcnow()
@@ -223,4 +222,4 @@ def post_tasks():
     current_app.logger.info("An agent returned task with results - uuid: {}".format(task_id))
     current_app.logger.debug("Task results: {}".format(result))
 
-    return ('', 200)
+    return '', 200

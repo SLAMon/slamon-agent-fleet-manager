@@ -1,5 +1,4 @@
 from datetime import datetime
-import json
 
 from slamon_afm.models import db, Task
 from slamon_afm.tests.afm_test import AFMTest
@@ -7,23 +6,33 @@ from slamon_afm.tests.afm_test import AFMTest
 
 class TestBMPSRoutes(AFMTest):
     def test_post_task(self):
-        self.test_app.post_json('/task', {
-            'task_id': 'de305d54-75b4-431b-adb2-eb6b9e546013',
-            'test_id': 'de305d54-75b4-431b-adb2-eb6b9e546013',
-            'task_type': 'wait',
-            'task_version': 1,
-            'task_data': {
-                'wait_time': 3600
-            }
-        })
+        self.assertEqual(
+            200,
+            self.test_app.post_json('/task', {
+                'task_id': 'de305d54-75b4-431b-adb2-eb6b9e546013',
+                'test_id': 'de305d54-75b4-431b-adb2-eb6b9e546013',
+                'task_type': 'wait',
+                'task_version': 1,
+                'task_data': {
+                    'wait_time': 3600
+                }
+            }).status_int
+        )
+
+        task = db.session.query(Task).filter(Task.uuid == str('de305d54-75b4-431b-adb2-eb6b9e546013')).one()
+        self.assertIsInstance(task.data, dict)
+        self.assertEqual(task.data['wait_time'], 3600)
 
         # Test without data
-        self.test_app.post_json('/task', {
-            'task_id': 'de305d54-75b4-431b-adb2-eb6b9e546014',
-            'test_id': 'de305d54-75b4-431b-adb2-eb6b9e546013',
-            'task_type': 'wait',
-            'task_version': 1
-        })
+        self.assertEqual(
+            200,
+            self.test_app.post_json('/task', {
+                'task_id': 'de305d54-75b4-431b-adb2-eb6b9e546014',
+                'test_id': 'de305d54-75b4-431b-adb2-eb6b9e546013',
+                'task_type': 'wait',
+                'task_version': 1
+            }).status_int
+        )
 
     def test_post_task_invalid(self):
         assert self.test_app.post_json('/task', expect_errors=True).status_int == 400
@@ -62,7 +71,7 @@ class TestBMPSRoutes(AFMTest):
         task1.uuid = 'de305d54-75b4-431b-adb2-eb6b9e546018'
         task1.test_id = 'de305d54-75b4-431b-adb2-eb6b9e546018'
         task1.claimed = datetime.utcnow()
-        task1.data = json.dumps({'wait_time': 123})
+        task1.data = {'wait_time': 123}
         db.session.add(task1)
         db.session.commit()
         db.session.close()
@@ -79,7 +88,7 @@ class TestBMPSRoutes(AFMTest):
         task1.uuid = 'de305d54-75b4-431b-adb2-eb6b9e546018'
         task1.test_id = 'de305d54-75b4-431b-adb2-eb6b9e546018'
         task1.claimed = datetime.utcnow()
-        task1.data = json.dumps({'wait_time': 123})
+        task1.data = {'wait_time': 123}
         db.session.add(task1)
 
         task2 = Task()
@@ -87,7 +96,7 @@ class TestBMPSRoutes(AFMTest):
         task2.test_id = 'de305d54-75b4-431b-adb2-eb6b9e546019'
         task2.claimed = datetime.utcnow()
         task2.completed = datetime.utcnow()
-        task2.result_data = json.dumps({'result': 'epic success'})
+        task2.result_data = {'result': 'epic success'}
         db.session.add(task2)
 
         task3 = Task()

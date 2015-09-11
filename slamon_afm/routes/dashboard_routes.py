@@ -1,40 +1,61 @@
 import os.path
-from flask import jsonify, send_file
+from flask import send_file
 from flask.blueprints import Blueprint
+from flask_restless import APIManager
 
 from slamon_afm.models import db, Agent, Task
+
+manager = APIManager(flask_sqlalchemy_db=db)
 
 blueprint = Blueprint('testing', __name__)
 
 
-def serialize_task(task):
-    return {
-        'task_id': task.uuid,
-        'task_type': task.type,
-        'task_version': task.version,
-        'test_id': task.test_id,
-        'task_failed': str(task.failed) if task.failed else None,
-        'task_completed': str(task.completed) if task.completed else None,
-        'task_result': task.result_data,
-        'task_error': task.error
-    }
+def task_get_many_preprocessor(search_params=None, **kw):
+    """
+    By default, list only pending tasks ordered by creation time.
+    """
+    if 'filters' not in search_params:
+        search_params['filters'] = [{'and': [{'name': 'assigned_agent_uuid', 'op': 'is_null'},
+                                             {'name': 'completed', 'op': 'is_null'},
+                                             {'name': 'error', 'op': 'is_null'}]}]
+    if 'order_by' not in search_params:
+        search_params['order_by'] = [{'field': 'created', 'direction': 'desc'}]
 
 
-def serialize_agent(agent):
-    return {
-        'agent_id': agent.uuid,
-        'agent_name': agent.name,
-        'last_seen': str(agent.last_seen),
-        'tasks': [serialize_task(task) for task in agent.tasks]
-    }
+def agent_get_many_preprocessor(search_params=None, **kw):
+    """
+    By default order agents by uuid
+    """
+    if 'order_by' not in search_params:
+        search_params['order_by'] = [{'field': 'uuid', 'direction': 'asc'}]
 
 
-@blueprint.route('/dashboard/status', strict_slashes=False)
-def dev_get_agents():
-    return jsonify(
-        tasks=[serialize_task(task) for task in db.session.query(Task).filter(Task.assigned_agent_uuid == None)],
-        agents=[serialize_agent(agent) for agent in db.session.query(Agent).all()]
-    )
+def register_blueprints(app):
+    app.register_blueprint(blueprint)
+    manager.init_app(app)
+    with app.app_context():
+        # Flask-restless provides no way to specify different serialization strategies for
+        # list and single object requests. As a workaround to improve dashboard status query
+        # efficiency, there's now two separate api endpoints for both tasks and agents:
+        # one with full object serialization and one with limited columns
+
+        # the /status -prefixed api endpoints will exclude all potentially large fields and relationships
+        # to achieve fast listing on entities and only enable readonly access.
+        manager.create_api(Agent, url_prefix='/status', app=app, methods=frozenset(['GET']),
+                           results_per_page=100, preprocessors={'GET_MANY': [agent_get_many_preprocessor]},
+                           exclude_columns=['capabilities', 'tasks.data', 'tasks.result_data', 'tasks.error',
+                                            'tasks.assigned_agent_uuid'])
+        manager.create_api(Task, url_prefix='/status', app=app, methods=frozenset(['GET']),
+                           results_per_page=100, max_results_per_page=1000,
+                           preprocessors={'GET_MANY': [task_get_many_preprocessor]},
+                           exclude_columns=['assigned_agent', 'data', 'result_data', 'error'])
+
+        # /api -prefixed routes will enable full serialization of and posting new tasks, excluding implicit
+        # nested relationships.
+        manager.create_api(Agent, url_prefix='/api', exclude_columns=['assigned_agent'], app=app,
+                           methods=frozenset(['GET']))
+        manager.create_api(Task, url_prefix='/api', exclude_columns=['assigned_agent'], app=app,
+                           methods=frozenset(['GET', 'POST']))
 
 
 @blueprint.route('/dashboard', strict_slashes=False)

@@ -22,7 +22,8 @@ setup(
         'jsonschema>=2.5.1, <3.0',
         'python_dateutil>= 2.4.2, <3.0',
         'flask>=0.10',
-        'flask-sqlalchemy>=2.0'
+        'flask-sqlalchemy>=2.0',
+        'flask-restless'
     ],
     entry_points={
         'console_scripts': [

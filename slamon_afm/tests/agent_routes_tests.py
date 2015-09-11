@@ -71,7 +71,7 @@ class TestPolling(AFMTest):
         task.test_id = 'de305d54-75b4-431b-adb2-eb6b9e546013'
         task.type = 'task-type-1'
         task.version = 1
-        task.data = "{}"
+        task.data = {}
         db.session.add(task)
         db.session.commit()
 
