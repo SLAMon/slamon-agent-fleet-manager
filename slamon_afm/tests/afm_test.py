@@ -45,10 +45,11 @@ class ConfigUtilTest(TestCase):
 
     def testOkLogLevels(self):
         # known values (standard logging levels)
-        for value in ('CRITICAL', 'Error', 'warning', 'INFO', 'DEBUG', 'NOTSET'):
-            self.assertEqual(getattr(logging, value.upper()), _log_level_from_str(value))
+        for name, value in {'CRITICAL': logging.CRITICAL, 'Error': logging.ERROR, 'warning': logging.WARNING,
+                            'INFO': logging.INFO, 'DEBUG': logging.DEBUG, 'NOTSET': logging.NOTSET}.items():
+            self.assertEqual(value, _log_level_from_str(name))
         # explicit integer values
-        for value in (-1, 0, 1, 50,100):
+        for value in (-1, 0, 1, 50, 100):
             self.assertEqual(value, _log_level_from_str('{}'.format(value)))
 
     def testNokLogLevels(self):
