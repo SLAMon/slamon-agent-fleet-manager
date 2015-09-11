@@ -1,21 +1,46 @@
 import logging
+
+import os
+
 from flask import Flask
 
 from slamon_afm.models import db
 from slamon_afm.routes import agent_routes, bpms_routes, status_routes, dashboard_routes
 
 
+def _log_level_from_str(log_level):
+    try:
+        return int(log_level)
+    except ValueError:
+        numeric_level = getattr(logging, log_level.upper(), None)
+        if not isinstance(numeric_level, int):
+            raise ValueError('Invalid log level: %s' % log_level)
+        return numeric_level
+
+
+def _bool_from_str(value):
+    if value.lower() in ['true', 'yes']:
+        return True
+    elif value.lower() in ['false', 'no']:
+        return False
+    raise ValueError('Invalid boolean value: %s' % value)
+
+
 class DefaultConfig(object):
     """
     Container for default configuration values
+
+    To simplify deployments using e.g. docker, each value is
+    queried from the process environment variables before
+    assigning the default value.
     """
-    SQLALCHEMY_DATABASE_URI = 'sqlite://'
-    AGENT_RETURN_TIME = 60
-    AGENT_ACTIVE_THRESHOLD = 300
-    AUTO_CREATE = True
-    LOG_FILE = None
-    LOG_LEVEL = logging.DEBUG
-    LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message).120s'
+    SQLALCHEMY_DATABASE_URI = os.getenv('SQLALCHEMY_DATABASE_URI', 'sqlite://')
+    AGENT_RETURN_TIME = int(os.getenv('AGENT_RETURN_TIME', 60))
+    AGENT_ACTIVE_THRESHOLD = int(os.getenv('AGENT_ACTIVE_THRESHOLD', 300))
+    AUTO_CREATE = _bool_from_str(os.getenv('AUTO_CREATE', 'True'))
+    LOG_FILE = os.getenv('LOG_FILE', None)
+    LOG_LEVEL = _log_level_from_str(os.getenv('LOG_LEVEL', 'INFO'))
+    LOG_FORMAT = os.getenv('LOG_FORMAT', '%(asctime)s - %(name)s - %(levelname)s - %(message).120s')
 
 
 def create_app(config=None, config_file=None):

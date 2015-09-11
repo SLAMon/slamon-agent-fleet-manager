@@ -41,6 +41,10 @@ Alternatively, you can specify the configuration file path or override the datab
                         Load AFM configuration from a file
 ```
 
+To simplify deployments using e.g. docker, each value is also queried from the process environment variables before
+assigning the default values. Possible configuration files and values supplied in command line will always override
+the ones in environment variables.
+
 ### Configuration keys
 
 SLAMon AFM usess the configuration utilities provided by Flask. In addition to SLAMon AFM specific configuration keys,
@@ -55,7 +59,7 @@ AGENT_RETURN_TIME         | Default polling interval for agents, defined in seco
 AGENT_ACTIVE_THRESHOLD    | Timeout to wait before considering an agent as lost, defined in seconds. default=300
 AUTO_CREATE               | Automatically create database tables before the first request. default=True
 LOG_FILE                  | Output log to a file instead of stderr. default=None
-LOG_LEVEL                 | Output log level. default=logging.DEBUG
+LOG_LEVEL                 | Output log level. default=logging.DEBUG. With environment variables use either integer values or one of the [standard logging level names](https://docs.python.org/3/library/logging.html#levels).
 LOG_FORMAT                | Output log format. default=`'%(asctime)s - %(name)s - %(levelname)s - %(message).120s'`
 
 
