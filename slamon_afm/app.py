@@ -1,11 +1,12 @@
 import logging
+from datetime import datetime, timedelta
 
 import os
-
 from flask import Flask
 
-from slamon_afm.models import db
 from sqlalchemy import event
+
+from slamon_afm.models import db, Agent, Task
 from slamon_afm.routes import agent_routes, bpms_routes, status_routes, dashboard_routes
 
 
@@ -38,7 +39,9 @@ class DefaultConfig(object):
     SQLALCHEMY_DATABASE_URI = os.getenv('SQLALCHEMY_DATABASE_URI', 'sqlite://')
     AGENT_RETURN_TIME = int(os.getenv('AGENT_RETURN_TIME', 60))
     AGENT_ACTIVE_THRESHOLD = int(os.getenv('AGENT_ACTIVE_THRESHOLD', 300))
+    AGENT_DROP_THRESHOLD = int(os.getenv('AGENT_DROP_THRESHOLD', 3600))
     AUTO_CREATE = _bool_from_str(os.getenv('AUTO_CREATE', 'True'))
+    AUTO_CLEANUP = _bool_from_str(os.getenv('AUTO_CLEANUP', 'True'))
     LOG_FILE = os.getenv('LOG_FILE', None)
     LOG_LEVEL = _log_level_from_str(os.getenv('LOG_LEVEL', 'INFO'))
     LOG_FORMAT = os.getenv('LOG_FORMAT', '%(asctime)s - %(name)s - %(levelname)s - %(message).120s')

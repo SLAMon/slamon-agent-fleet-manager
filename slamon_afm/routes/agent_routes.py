@@ -6,6 +6,7 @@ from flask import request, abort, current_app
 from flask.blueprints import Blueprint
 from flask.json import jsonify
 from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy.exc import SQLAlchemyError
 from dateutil import tz
 
 from slamon_afm.models import db, Agent, Task
@@ -123,6 +124,16 @@ def request_tasks():
     except jsonschema.ValidationError:
         current_app.logger.error('Invalid JSON data provided with request.')
         abort(400)
+
+    # cleanup inactive agents
+    if current_app.config['AUTO_CLEANUP']:
+        try:
+            current_app.logger.debug("Cleaning inactive agents...")
+            Agent.drop_inactive(datetime.utcnow() - timedelta(0, current_app.config['AGENT_DROP_THRESHOLD']))
+            Task.unassign_inactive(datetime.utcnow() - timedelta(0, current_app.config['AGENT_ACTIVE_THRESHOLD']))
+            db.session.commit()
+        except SQLAlchemyError as e:
+            current_app.logger.error("Failed cleaning up inactive agents: {0}".format(e))
 
     protocol = int(data['protocol'])
     agent_uuid = str(data['agent_id'])
