@@ -60,11 +60,22 @@ class Agent(db.Model):
                 )
             )
 
+    @staticmethod
+    def drop_inactive(last_seen_threshold):
+        """
+        Drop all agents not seen after defined datetime. Relying on foreign key
+        cascades to unassign all claimed tasks.
+
+        :param last_seen_threshold: drop agents that have not been seen after this datetime
+        """
+
+        db.session.query(Agent).filter(Agent.last_seen < last_seen_threshold).delete(synchronize_session=False)
+
 
 class AgentCapability(db.Model):
     __tablename__ = 'agent_capabilities'
 
-    agent_uuid = Column('agent_uuid', CHAR(36), ForeignKey('agents.uuid'))
+    agent_uuid = Column('agent_uuid', CHAR(36), ForeignKey('agents.uuid', ondelete='CASCADE', onupdate='CASCADE'))
     agent = relationship(Agent, backref=backref("capabilities", cascade="all, delete-orphan"))
 
     type = Column('type', String)
@@ -87,7 +98,7 @@ class Task(db.Model):
     result_data = Column('result_data', String)  # TODO - use json blob with psql
 
     # Agent that has been assigned to take care of the task - NULL if not claimed yet
-    assigned_agent_uuid = Column('assigned_agent_uuid', CHAR(36), ForeignKey('agents.uuid'))
+    assigned_agent_uuid = Column('assigned_agent_uuid', ForeignKey('agents.uuid', ondelete='SET NULL'))
     assigned_agent = relationship(Agent, backref="tasks")
 
     # When was the task added
@@ -110,7 +121,8 @@ class Task(db.Model):
         :param max_tasks: Maximum number of tasks to assign
         :return: A generator enumerating assigned tasks
         """
-        query = db.session.query(AgentCapability, Task).filter(Task.assigned_agent_uuid.is_(None)). \
+        query = db.session.query(AgentCapability, Task).\
+            filter(and_(Task.assigned_agent_uuid.is_(None), Task.completed.is_(None), Task.error.is_(None))). \
             filter(AgentCapability.agent_uuid == agent.uuid). \
             filter(and_(AgentCapability.type == Task.type, AgentCapability.version == Task.version))
 
@@ -120,3 +132,19 @@ class Task(db.Model):
             task.assigned_agent_uuid = agent.uuid
             task.claimed = datetime.utcnow()
             yield task
+
+    @staticmethod
+    def unassign_inactive(last_seen_threshold):
+        """
+        Unassign all tasks claimed by agents that have not been seen after defined datetime
+
+        :param last_seen_threshold: unassign tasks claimed by agents not seen after this datetime
+        """
+
+        db.session.query(Task).filter(Task.assigned_agent.has(Agent.last_seen < last_seen_threshold)).update(
+            {
+                'assigned_agent_uuid': None,
+                'claimed': None
+            },
+            synchronize_session=False
+        )

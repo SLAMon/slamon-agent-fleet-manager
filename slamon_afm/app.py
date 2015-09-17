@@ -5,6 +5,7 @@ import os
 from flask import Flask
 
 from slamon_afm.models import db
+from sqlalchemy import event
 from slamon_afm.routes import agent_routes, bpms_routes, status_routes, dashboard_routes
 
 
@@ -79,5 +80,13 @@ def create_app(config=None, config_file=None):
 
     # register app for Flask-SQLAlchemy DB
     db.init_app(app)
+
+    # register event listener to enable foreign_keys for SQLite databases
+    def on_connect(conn, record):
+        if db.engine.name == 'sqlite':
+            conn.execute('pragma foreign_keys=ON')
+
+    with app.app_context():
+        event.listen(db.engine, 'connect', on_connect)
 
     return app
