@@ -52,17 +52,21 @@
 <nav class="navbar navbar-default">
 	<div class="container">
 		<div class="navbar-header"><a class="navbar-brand" href="#">SLAMon Status</a></div>
-		<ul class="nav navbar-nav navbar-right">
-			<li><a href="#" id="add-task-button">Add a task</a></li>
-		</ul>
+		<form class="navbar-form navbar-right" role="search">
+			<div class="input-group">
+				<input id="search-input" type="text" class="form-control" placeholder="Search">
+				<span class="input-group-btn">
+					<button id="search-task-button" class="btn btn-default" type="button">Task</button>
+					<button id="search-test-button" class="btn btn-default" type="button">Test</button>
+				</span>
+			</div>
+			<button id="add-task-button" type="button" class="btn btn-default"><span class="glyphicon glyphicon-plus" aria-hidden="true"></span> Add a task</button>
+		</form>
 	</div>
 </nav>
 
 <div id="status">
-
-
 </div>
-
 
 <div class="modal fade" id="add-modal">
 	<div class="modal-dialog">
@@ -304,6 +308,39 @@
 		}
 	});
 
+	var TestDetails = React.createClass({
+		mixins: [ModalMixin, JsonStateMixin],
+		stateUrl: function () {
+			return '/status/tasks?' + $.param(filtersData([{"name": "test_id", "op": "equals", "val": this.props.testId}]));
+		},
+		render: function () {
+			return (
+					<div className="modal fade">
+						<div className="modal-dialog">
+							<div className="modal-content">
+								<div className="modal-header">
+									<button type="button" className="close" data-dismiss="modal" aria-label="Close">
+										<span aria-hidden="true">&times;</span>
+									</button>
+									<h4 className="modal-title">Test: {this.props.testId}</h4>
+								</div>
+								<div className="modal-body">
+									<Alert error={this.state.stateError}/>
+									<div className="container-fluid">
+										<TaskList tasks={this.state.objects || []}/>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+			);
+		}
+	});
+
+	function showTestDetails(testId) {
+		React.render(<TestDetails testId={testId}/>, $("<div>").appendTo("body")[0]);
+	}
+
 	/** Render an agent instance. */
 	var Agent = React.createClass({
 		render: function () {
@@ -398,6 +435,8 @@
 	$("#add-task-button").click(function () {
 		$("#add-modal").modal("show");
 	});
+	$("#search-test-button").click(function() { showTestDetails($("#search-input").val()); });
+	$("#search-task-button").click(function() { showTaskDetails($("#search-input").val()); });
 </script>
 
 </body>
