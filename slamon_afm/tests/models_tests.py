@@ -32,6 +32,8 @@ class TaskUnassignTests(AFMTest):
         db.session.add(self.task)
 
         db.session.flush()
+        self.assertEqual(len(self.agent.tasks), 1)
+        self.assertIsNotNone(self.task.assigned_agent_uuid)
 
     def testUnassignInactive(self):
         Task.unassign_inactive(datetime.utcnow())
