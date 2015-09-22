@@ -407,6 +407,20 @@
 	// Apply the status view
 	React.render(<Status source="/status/tasks"/>, $("#status")[0]);
 
+	function randomizeTaskId() {
+		function guid() {
+			function s4() {
+				return Math.floor((1 + Math.random()) * 0x10000)
+						.toString(16)
+						.substring(1);
+			}
+
+			return s4() + s4() + '-' + s4() + '-' + s4() + '-' +
+					s4() + '-' + s4() + s4() + s4();
+		}
+		$("#task_id").val(guid());
+	}
+
 	$("#task_form").submit(function (e) {
 		e.stopPropagation();
 		var values = {
@@ -433,6 +447,7 @@
 	});
 	$("#add-modal").modal({show: false});
 	$("#add-task-button").click(function () {
+		randomizeTaskId();
 		$("#add-modal").modal("show");
 	});
 	$("#search-test-button").click(function() { showTestDetails($("#search-input").val()); });
