@@ -105,24 +105,25 @@ def get_task(task_uuid):
     try:
         query = db.session.query(Task)
         task = query.filter(Task.uuid == str(task_uuid)).one()
+
+        task_desc = {
+            'task_id': task.uuid,
+            'test_id': task.test_id,
+            'task_type': task.type,
+            'task_version': task.version
+        }
+
+        if task.data is not None:
+            task_desc['task_data'] = json.loads(task.data)
+
+        if task.failed:
+            task_desc['task_failed'] = str(task.failed)
+            task_desc['task_error'] = str(task.error)
+        elif task.completed:
+            task_desc['task_completed'] = str(task.completed)
+            task_desc['task_result'] = json.loads(task.result_data)
+
+        return jsonify(task_desc)
+
     except NoResultFound:
         abort(404)
-
-    task_desc = {
-        'task_id': task.uuid,
-        'test_id': task.test_id,
-        'task_type': task.type,
-        'task_version': task.version
-    }
-
-    if task.data is not None:
-        task_desc['task_data'] = json.loads(task.data)
-
-    if task.failed:
-        task_desc['task_failed'] = str(task.failed)
-        task_desc['task_error'] = str(task.error)
-    elif task.completed:
-        task_desc['task_completed'] = str(task.completed)
-        task_desc['task_result'] = json.loads(task.result_data)
-
-    return jsonify(task_desc)

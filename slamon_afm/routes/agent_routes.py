@@ -193,6 +193,7 @@ def post_tasks():
         current_app.logger.error("Invalid protocol in task response: {0}".format(protocol))
         abort(400)
 
+    result = ""
     try:
         task = db.session.query(Task).filter(Task.uuid == str(task_id)).one()
 
@@ -200,7 +201,6 @@ def post_tasks():
             current_app.logger.error("Incomplete task posted!")
             abort(400)
 
-        result = ""
         if 'task_data' in data:
             task.result_data = json.dumps(data['task_data'])
             task.completed = datetime.utcnow()
@@ -211,13 +211,11 @@ def post_tasks():
             result = task.error
 
         db.session.add(task)
+        db.session.commit()
     except NoResultFound:
         current_app.logger.error("No matching task in for task response!")
         abort(400)
-
-    try:
-        db.session.commit()
-    except Exception:
+    except SQLAlchemyError:
         db.session.rollback()
         current_app.logger.error("Failed to commit database changes for task result POST")
         abort(500)

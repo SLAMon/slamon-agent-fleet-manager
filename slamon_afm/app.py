@@ -1,12 +1,11 @@
 import logging
-from datetime import datetime, timedelta
 
 import os
 from flask import Flask
 
 from sqlalchemy import event
 
-from slamon_afm.models import db, Agent, Task
+from slamon_afm.models import db
 from slamon_afm.routes import agent_routes, bpms_routes, status_routes, dashboard_routes
 
 

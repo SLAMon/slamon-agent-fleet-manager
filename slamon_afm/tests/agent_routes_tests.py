@@ -133,11 +133,11 @@ class TestPolling(AFMTest):
         agent = db.session.query(Agent).filter(Agent.uuid == 'de305d54-75b4-431b-adb2-eb6b9e546013').one()
         self.assertEqual(len(agent.capabilities), 3)
 
-        self.assertEqual(db.session.query(AgentCapability).filter(AgentCapability.agent_uuid == agent.uuid). \
+        self.assertEqual(db.session.query(AgentCapability).filter(AgentCapability.agent_uuid == agent.uuid).
                          filter(AgentCapability.type == 'task-type-1').one().version, 2)
-        self.assertEqual(db.session.query(AgentCapability).filter(AgentCapability.agent_uuid == agent.uuid). \
+        self.assertEqual(db.session.query(AgentCapability).filter(AgentCapability.agent_uuid == agent.uuid).
                          filter(AgentCapability.type == 'task-type-3').one().version, 3)
-        self.assertEqual(db.session.query(AgentCapability).filter(AgentCapability.agent_uuid == agent.uuid). \
+        self.assertEqual(db.session.query(AgentCapability).filter(AgentCapability.agent_uuid == agent.uuid).
                          filter(AgentCapability.type == 'task-type-4').one().version, 4)
 
     def test_poll_tasks_invalid_data(self):
