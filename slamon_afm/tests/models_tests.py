@@ -33,7 +33,7 @@ class TaskUnassignTests(AFMTest):
         db.session.add(self.task)
 
         db.session.flush()
-        self.assertEqual(len(self.agent.tasks), 1)
+        self.assertEqual(self.agent.tasks.count(), 1)
         self.assertIsNotNone(self.task.assigned_agent_uuid)
 
     def testFailTasksFromInactiveAgents(self):
@@ -42,7 +42,7 @@ class TaskUnassignTests(AFMTest):
         db.session.refresh(self.agent)
         db.session.refresh(self.task)
 
-        self.assertEqual(len(self.agent.tasks), 1)
+        self.assertEqual(self.agent.tasks.count(), 1)
         self.assertIsNotNone(self.task.failed)
         self.assertIsNotNone(self.task.error)
 

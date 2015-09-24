@@ -37,10 +37,19 @@
 			cursor: pointer;
 		}
 
-		.agent-list {
-			margin-left: -15px;
-			margin-right: -15px;
+		td > span.label {
+			display: block;
+			overflow: initial;
+			text-overflow: initial;
+			padding-left: 0.2em;
+			padding-right: 0.2em;
 		}
+
+		.task-list {
+			overflow: auto;
+			max-height: 300pt;
+		}
+
 		.modal .row {
 			margin-top: 2pt;
 			margin-bottom: 2pt;
@@ -341,19 +350,113 @@
 		React.render(<TestDetails testId={testId}/>, $("<div>").appendTo("body")[0]);
 	}
 
-	/** Render an agent instance. */
-	var Agent = React.createClass({
+	var AgentTasksList = React.createClass({
+		mixins: [JsonStateMixin],
+		stateUrl: function () {
+			return '/status/tasks?' + $.param(filtersData([{
+						"name": "assigned_agent_uuid",
+						"op": "equals",
+						"val": this.props.agentId
+					}]));
+		},
 		render: function () {
 			return (
-					<div className="col-md-4 col-sm-6">
-						<div className="panel panel-default">
-							<div className="panel-heading">{this.props.agent.name}
-								<br/>
-								({this.props.agent.uuid})
+					<div className="container-fluid">
+						<h4>Tasks</h4>
+						<Alert error={this.state.stateError}/>
+						<TaskList tasks={this.state.objects || []}/>
+					</div>
+			);
+		}
+	});
+
+	var AgentDetails = React.createClass({
+		mixins: [ModalMixin, JsonStateMixin],
+		stateUrl: function () {
+			return '/api/agents/' + this.props.agentId;
+		},
+		render: function () {
+			return (
+					<div className="modal fade">
+						<div className="modal-dialog">
+							<div className="modal-content">
+								<div className="modal-header">
+									<button type="button" className="close" data-dismiss="modal" aria-label="Close">
+										<span aria-hidden="true">&times;</span>
+									</button>
+									<h4 className="modal-title">Agent: {this.props.agentId}</h4>
+								</div>
+								<div className="modal-body">
+									<Alert error={this.state.stateError}/>
+
+									<div className="container-fluid">
+										<div className="row">
+											<div className="col-xs-3">
+												<strong>Name</strong>
+											</div>
+											<div className="col-xs-9">{this.state.name}</div>
+										</div>
+										<div className="row">
+											<div className="col-xs-3">
+												<strong>Last seen</strong>
+											</div>
+											<div className="col-xs-9">{this.state.last_seen}</div>
+										</div>
+										<div className="row">
+											<div className="col-xs-3">
+												<strong>Capabilities</strong>
+											</div>
+											<div className="col-xs-9">
+												{(this.state.capabilities || []).map(function (capability, i) {
+													return (<span>
+														<span className="label label-default">{capability.type + ": " + capability.version}</span>
+														{' '}
+													</span>);
+												}.bind(this))}
+											</div>
+										</div>
+									</div>
+									<AgentTasksList agentId={this.props.agentId || []}/>
+								</div>
 							</div>
-							<TaskList tasks={this.props.agent.tasks}/>
 						</div>
 					</div>
+			);
+		}
+	});
+
+	function showAgentDetails(agentId) {
+		React.render(<AgentDetails agentId={agentId}/>, $("<div>").appendTo("body")[0]);
+	}
+
+	/** Render an agent instance. */
+	var Agent = React.createClass({
+		onClick: function () {
+			showAgentDetails(this.props.agent.uuid);
+		},
+		render: function () {
+			var sum = this.props.agent.tasks_summary;
+			return (
+					<tr onClick={this.onClick}>
+						<td>
+							<span>{this.props.agent.name}</span>
+						</td>
+						<td>
+							<span>{this.props.agent.uuid}</span>
+						</td>
+						<td>
+							<span>{this.props.agent.last_seen}</span>
+						</td>
+						<td title="Pending">
+							<span className="label label-default">{sum.assigned - sum.completed - sum.failed}</span>
+						</td>
+						<td title="Handled">
+							<span className="label label-success">{sum.completed}</span>
+						</td>
+						<td title="Error">
+							<span className="label label-danger">{sum.failed}</span>
+						</td>
+					</tr>
 			);
 		}
 	});
@@ -362,11 +465,20 @@
 	var AgentList = React.createClass({
 		render: function () {
 			return (
-					<ReactCSSTransitionGroup component="div" transitionName="row" className="agent-list">
-						{this.props.agents.map(function (agent, i) {
-							return (<Agent key={agent.uuid} agent={agent}> {agent}</Agent>);
-						}.bind(this))}
-					</ReactCSSTransitionGroup>
+
+					<table className="table">
+						<thead>
+							<th width="20%">Agent</th>
+							<th>UUID</th>
+							<th>Last seen</th>
+							<th width="20%" colSpan="3">Tasks</th>
+						</thead>
+						<ReactCSSTransitionGroup component="tbody" transitionName="row">
+							{this.props.agents.map(function (agent, i) {
+								return (<Agent key={agent.uuid} agent={agent}> {agent}</Agent>);
+							}.bind(this))}
+						</ReactCSSTransitionGroup>
+					</table>
 			);
 		}
 	});
@@ -393,11 +505,9 @@
 		render: function () {
 			return (
 					<div className="container">
-						<div className="panel panel-default">
-							<div className="panel-heading">Pending tasks</div>
-							<TaskList tasks={this.state.tasks}></TaskList>
-						</div>
-						<h4>Agents</h4>
+						<h3>Pending tasks</h3>
+						<TaskList tasks={this.state.tasks}></TaskList>
+						<h3>Agents</h3>
 						<AgentList agents={this.state.agents}></AgentList>
 					</div>
 			);

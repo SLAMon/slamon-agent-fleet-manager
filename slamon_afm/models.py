@@ -7,6 +7,7 @@ from sqlalchemy import Column, Integer, CHAR, DateTime, String, ForeignKey, Prim
     TypeDecorator
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy import func
 
 db = SQLAlchemy()
 
@@ -61,6 +62,21 @@ class Agent(db.Model):
                     version=version
                 )
             )
+
+    def tasks_summary(self):
+        """
+        Fetch summary of tasks assigned and handled by the agent.
+
+        :return: A dict containing keys 'assigned', 'completed' and 'error'.
+        """
+        return dict(zip(
+            ('assigned', 'completed', 'failed'),
+            db.session.query(
+                func.count(Task.uuid),
+                func.count(Task.completed),
+                func.count(Task.failed)
+            ).filter(Task.assigned_agent_uuid == self.uuid).one()
+        ))
 
     @staticmethod
     def drop_inactive(last_seen_threshold):
@@ -129,7 +145,7 @@ class Task(db.Model):
 
     # Agent that has been assigned to take care of the task - NULL if not claimed yet
     assigned_agent_uuid = Column('assigned_agent_uuid', ForeignKey('agents.uuid', ondelete='SET NULL'))
-    assigned_agent = relationship(Agent, backref="tasks")
+    assigned_agent = relationship(Agent, backref=backref("tasks", lazy='dynamic'))
 
     # When was the task added
     created = Column('created', DateTime, default=datetime.utcnow, nullable=False)

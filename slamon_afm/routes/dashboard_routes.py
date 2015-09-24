@@ -42,9 +42,9 @@ def register_blueprints(app):
         # the /status -prefixed api endpoints will exclude all potentially large fields and relationships
         # to achieve fast listing on entities and only enable readonly access.
         manager.create_api(Agent, url_prefix='/status', app=app, methods=frozenset(['GET']),
+                           include_methods=['tasks_summary'],
                            results_per_page=100, preprocessors={'GET_MANY': [agent_get_many_preprocessor]},
-                           exclude_columns=['capabilities', 'tasks.data', 'tasks.result_data', 'tasks.error',
-                                            'tasks.assigned_agent_uuid'])
+                           exclude_columns=['capabilities', 'tasks'])
         manager.create_api(Task, url_prefix='/status', app=app, methods=frozenset(['GET']),
                            results_per_page=100, max_results_per_page=1000,
                            preprocessors={'GET_MANY': [task_get_many_preprocessor]},
@@ -52,7 +52,7 @@ def register_blueprints(app):
 
         # /api -prefixed routes will enable full serialization of and posting new tasks, excluding implicit
         # nested relationships.
-        manager.create_api(Agent, url_prefix='/api', exclude_columns=['assigned_agent'], app=app,
+        manager.create_api(Agent, url_prefix='/api', exclude_columns=['tasks'], app=app,
                            methods=frozenset(['GET']))
         manager.create_api(Task, url_prefix='/api', exclude_columns=['assigned_agent'], app=app,
                            methods=frozenset(['GET', 'POST']))
