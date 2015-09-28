@@ -130,7 +130,7 @@ def request_tasks():
         try:
             current_app.logger.debug("Cleaning inactive agents...")
             Agent.drop_inactive(datetime.utcnow() - timedelta(0, current_app.config['AGENT_DROP_THRESHOLD']))
-            Task.unassign_inactive(datetime.utcnow() - timedelta(0, current_app.config['AGENT_ACTIVE_THRESHOLD']))
+            Task.update_inactive(datetime.utcnow() - timedelta(0, current_app.config['AGENT_ACTIVE_THRESHOLD']))
             db.session.commit()
         except SQLAlchemyError as e:
             current_app.logger.error("Failed cleaning up inactive agents: {0}".format(e))

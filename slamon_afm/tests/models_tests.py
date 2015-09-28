@@ -27,6 +27,7 @@ class TaskUnassignTests(AFMTest):
             type='task-type-1',
             version=1,
             data="{}",
+            claimed=datetime.utcnow(),
             assigned_agent=self.agent
         )
         db.session.add(self.task)
@@ -35,14 +36,15 @@ class TaskUnassignTests(AFMTest):
         self.assertEqual(len(self.agent.tasks), 1)
         self.assertIsNotNone(self.task.assigned_agent_uuid)
 
-    def testUnassignInactive(self):
-        Task.unassign_inactive(datetime.utcnow())
+    def testFailTasksFromInactiveAgents(self):
+        Task.update_inactive(datetime.utcnow())
         db.session.flush()
         db.session.refresh(self.agent)
         db.session.refresh(self.task)
 
-        self.assertEqual(len(self.agent.tasks), 0)
-        self.assertIsNone(self.task.assigned_agent_uuid)
+        self.assertEqual(len(self.agent.tasks), 1)
+        self.assertIsNotNone(self.task.failed)
+        self.assertIsNotNone(self.task.error)
 
     def testDropAgents(self):
         Agent.drop_inactive(datetime.utcnow())
@@ -51,6 +53,8 @@ class TaskUnassignTests(AFMTest):
 
         self.assertEqual(db.session.query(Agent).count(), 0)
         self.assertIsNone(self.task.assigned_agent_uuid)
+        self.assertIsNotNone(self.task.failed)
+        self.assertIsNotNone(self.task.error)
 
     def testDropAgentsWithCapabilities(self):
         self.agent.capabilities.append(AgentCapability(type='task-type-test', version=1))

@@ -64,12 +64,26 @@ class Agent(db.Model):
     def drop_inactive(last_seen_threshold):
         """
         Drop all agents not seen after defined datetime. Relying on foreign key
-        cascades to unassign all claimed tasks.
+        cascades to deassign all claimed tasks.
 
         :param last_seen_threshold: drop agents that have not been seen after this datetime
         """
 
+        # delete agents
         db.session.query(Agent).filter(Agent.last_seen < last_seen_threshold).delete(synchronize_session=False)
+
+        # mark deassigned tasks as failed. This would be bit more efficient with SQL triggers, but this would
+        # require dialect specific triggers and still maintain this as a fallback when no triggers exists.
+        db.session.query(Task).filter(and_(Task.assigned_agent_uuid == None,
+                                           Task.claimed != None,
+                                           Task.failed == None,
+                                           Task.completed == None)).update(
+            {
+                'failed': datetime.utcnow(),
+                'error': 'Assigned agent reached last seen threshold and is now considered as inactive.'
+            },
+            synchronize_session=False
+        )
 
 
 class AgentCapability(db.Model):
@@ -134,17 +148,17 @@ class Task(db.Model):
             yield task
 
     @staticmethod
-    def unassign_inactive(last_seen_threshold):
+    def update_inactive(last_seen_threshold):
         """
-        Unassign all tasks claimed by agents that have not been seen after defined datetime
+        Mark all tasks claimed by agents that have not been seen after defined datetime as failed
 
-        :param last_seen_threshold: unassign tasks claimed by agents not seen after this datetime
+        :param last_seen_threshold: select tasks claimed by agents not seen after this datetime
         """
 
         db.session.query(Task).filter(Task.assigned_agent.has(Agent.last_seen < last_seen_threshold)).update(
             {
-                'assigned_agent_uuid': None,
-                'claimed': None
+                'failed': datetime.utcnow(),
+                'error': 'Assigned agent reached last seen threshold and is now considered as inactive.'
             },
             synchronize_session=False
         )
