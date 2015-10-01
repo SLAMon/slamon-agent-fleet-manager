@@ -172,7 +172,8 @@ class Task(db.Model):
         query = db.session.query(AgentCapability, Task). \
             filter(and_(Task.assigned_agent_uuid.is_(None), Task.completed.is_(None), Task.error.is_(None))). \
             filter(AgentCapability.agent_uuid == agent.uuid). \
-            filter(and_(AgentCapability.type == Task.type, AgentCapability.version == Task.version))
+            filter(and_(AgentCapability.type == Task.type, AgentCapability.version == Task.version)). \
+            order_by(Task.created)
 
         # Assign available tasks to the agent and mark them as being in process
         for _, task in query[0:max_tasks]:

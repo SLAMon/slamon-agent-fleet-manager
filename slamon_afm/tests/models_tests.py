@@ -1,4 +1,6 @@
 from datetime import datetime
+from itertools import permutations
+from uuid import UUID, uuid5
 
 from slamon_afm.models import db, Task, Agent, AgentCapability
 from slamon_afm.tests.afm_test import AFMTest
@@ -26,7 +28,7 @@ class TaskUnassignTests(AFMTest):
             test_id='de305d54-75b4-431b-adb2-eb6b9e546013',
             type='task-type-1',
             version=1,
-            data="{}",
+            data={},
             claimed=datetime.utcnow(),
             assigned_agent=self.agent
         )
@@ -87,7 +89,7 @@ class TaskClaimingTests(AFMTest):
             test_id='de305d54-75b4-431b-adb2-eb6b9e546013',
             type='task-type-1',
             version=1,
-            data="{}"
+            data={}
         )
         db.session.add(task)
         db.session.flush()
@@ -95,15 +97,50 @@ class TaskClaimingTests(AFMTest):
         claimed = list(Task.claim_tasks(self.agent, 1))
         self.assertEqual(len(claimed), 1)
 
+    def testClaimTaskOrder(self):
+        """
+        Ensure the oldest task is always served first
+        """
+        times = list(permutations([
+            datetime(2015, 10, 1, 10, 0, 0),
+            datetime(2015, 10, 1, 11, 0, 0),
+            datetime(2015, 10, 1, 12, 0, 0)
+        ]))
+
+        def create_uuid(*args):
+            return str(uuid5(UUID('de305d54-75b4-431b-adb2-eb6b9e546013'), '.'.join(map(str, args))))
+
+        for seq in range(len(times)):
+            for time in times[seq]:
+                db.session.add(Task(
+                    created=time,
+                    uuid=create_uuid(time, seq),
+                    test_id='de305d54-75b4-431b-adb2-eb6b9e546013',
+                    type='task-type-1',
+                    version=1,
+                    data={}
+                ))
+                db.session.flush()
+
+            # claim tasks one by one to figure the served order
+            claimed = (
+                list(Task.claim_tasks(self.agent, 1))[0],
+                list(Task.claim_tasks(self.agent, 1))[0],
+                list(Task.claim_tasks(self.agent, 1))[0]
+            )
+
+            self.assertLess(claimed[0].created, claimed[1].created)
+            self.assertLess(claimed[1].created, claimed[2].created)
+
     def testDontClaimCompleteTasks(self):
         task = Task(
             uuid='de305d54-75b4-431b-adb2-eb6b9e546013',
             test_id='de305d54-75b4-431b-adb2-eb6b9e546013',
             type='task-type-1',
             version=1,
-            data="{}",
+            data={},
             completed=datetime.now(),
-            result_data='{}'
+            result_data={}
         )
         db.session.add(task)
         db.session.flush()
@@ -117,7 +154,7 @@ class TaskClaimingTests(AFMTest):
             test_id='de305d54-75b4-431b-adb2-eb6b9e546013',
             type='task-type-1',
             version=1,
-            data="{}",
+            data={},
             failed=datetime.now(),
             error='some error'
         )
