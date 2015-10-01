@@ -6,6 +6,7 @@ from flask import request, abort, current_app
 from flask.blueprints import Blueprint
 from flask.json import jsonify
 from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy.exc import SQLAlchemyError
 from dateutil import tz
 
 from slamon_afm.models import db, Agent, Task
@@ -124,6 +125,16 @@ def request_tasks():
         current_app.logger.error('Invalid JSON data provided with request.')
         abort(400)
 
+    # cleanup inactive agents
+    if current_app.config['AUTO_CLEANUP']:
+        try:
+            current_app.logger.debug("Cleaning inactive agents...")
+            Agent.drop_inactive(datetime.utcnow() - timedelta(0, current_app.config['AGENT_DROP_THRESHOLD']))
+            Task.update_inactive(datetime.utcnow() - timedelta(0, current_app.config['AGENT_ACTIVE_THRESHOLD']))
+            db.session.commit()
+        except SQLAlchemyError as e:
+            current_app.logger.error("Failed cleaning up inactive agents: {0}".format(e))
+
     protocol = int(data['protocol'])
     agent_uuid = str(data['agent_id'])
     agent_name = str(data['agent_name'])
@@ -182,6 +193,7 @@ def post_tasks():
         current_app.logger.error("Invalid protocol in task response: {0}".format(protocol))
         abort(400)
 
+    result = ""
     try:
         task = db.session.query(Task).filter(Task.uuid == str(task_id)).one()
 
@@ -189,7 +201,6 @@ def post_tasks():
             current_app.logger.error("Incomplete task posted!")
             abort(400)
 
-        result = ""
         if 'task_data' in data:
             task.result_data = json.dumps(data['task_data'])
             task.completed = datetime.utcnow()
@@ -200,13 +211,11 @@ def post_tasks():
             result = task.error
 
         db.session.add(task)
+        db.session.commit()
     except NoResultFound:
         current_app.logger.error("No matching task in for task response!")
         abort(400)
-
-    try:
-        db.session.commit()
-    except Exception:
+    except SQLAlchemyError:
         db.session.rollback()
         current_app.logger.error("Failed to commit database changes for task result POST")
         abort(500)

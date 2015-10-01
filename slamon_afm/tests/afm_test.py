@@ -25,6 +25,7 @@ class AFMTest(TestCase):
         self.test_app = TestApp(self.app)
 
     def tearDown(self):
+        db.session.rollback()
         db.drop_all()
         self.app_context.pop()
 

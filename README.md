@@ -57,7 +57,9 @@ Key                       | Description
 SQLALCHEMY_DATABASE_URI   | The database URI that should be used for the connection. default='sqlite://'
 AGENT_RETURN_TIME         | Default polling interval for agents, defined in seconds. default=60
 AGENT_ACTIVE_THRESHOLD    | Timeout to wait before considering an agent as lost, defined in seconds. default=300
+AGENT_DROP_THRESHOLD      | Timeout to wait before deleting a lost agent, defined in seconds. default=3600
 AUTO_CREATE               | Automatically create database tables before the first request. default=True
+AUTO_CLEANUP              | Run cleanup routines every time an agent requests for tasks. default=True
 LOG_FILE                  | Output log to a file instead of stderr. default=None
 LOG_LEVEL                 | Output log level. default=logging.DEBUG. With environment variables use either integer values or one of the [standard logging level names](https://docs.python.org/3/library/logging.html#levels).
 LOG_FORMAT                | Output log format. default=`'%(asctime)s - %(name)s - %(levelname)s - %(message).120s'`

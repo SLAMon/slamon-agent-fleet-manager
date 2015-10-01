@@ -1,8 +1,9 @@
 import logging
 
 import os
-
 from flask import Flask
+
+from sqlalchemy import event
 
 from slamon_afm.models import db
 from slamon_afm.routes import agent_routes, bpms_routes, status_routes, dashboard_routes
@@ -37,7 +38,9 @@ class DefaultConfig(object):
     SQLALCHEMY_DATABASE_URI = os.getenv('SQLALCHEMY_DATABASE_URI', 'sqlite://')
     AGENT_RETURN_TIME = int(os.getenv('AGENT_RETURN_TIME', 60))
     AGENT_ACTIVE_THRESHOLD = int(os.getenv('AGENT_ACTIVE_THRESHOLD', 300))
+    AGENT_DROP_THRESHOLD = int(os.getenv('AGENT_DROP_THRESHOLD', 3600))
     AUTO_CREATE = _bool_from_str(os.getenv('AUTO_CREATE', 'True'))
+    AUTO_CLEANUP = _bool_from_str(os.getenv('AUTO_CLEANUP', 'True'))
     LOG_FILE = os.getenv('LOG_FILE', None)
     LOG_LEVEL = _log_level_from_str(os.getenv('LOG_LEVEL', 'INFO'))
     LOG_FORMAT = os.getenv('LOG_FORMAT', '%(asctime)s - %(name)s - %(levelname)s - %(message).120s')
@@ -79,5 +82,13 @@ def create_app(config=None, config_file=None):
 
     # register app for Flask-SQLAlchemy DB
     db.init_app(app)
+
+    # register event listener to enable foreign_keys for SQLite databases
+    def on_connect(conn, record):
+        if db.engine.name == 'sqlite':
+            conn.execute('pragma foreign_keys=ON')
+
+    with app.app_context():
+        event.listen(db.engine, 'connect', on_connect)
 
     return app
