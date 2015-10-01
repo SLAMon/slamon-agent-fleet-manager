@@ -26,73 +26,110 @@
 		tr, td {
 			transition: background-color .5s ease-in;
 		}
+		table {
+			table-layout: fixed;
+		}
+		td > span {
+			display: block;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			cursor: pointer;
+		}
+
+		td > span.label {
+			display: block;
+			overflow: initial;
+			text-overflow: initial;
+			padding-left: 0.2em;
+			padding-right: 0.2em;
+		}
+
+		.task-list {
+			overflow: auto;
+			max-height: 300pt;
+		}
+
+		.modal .row {
+			margin-top: 2pt;
+			margin-bottom: 2pt;
+		}
 	</style>
 </head>
 <body>
-<div class="container">
-	<h1>SLAMon AFM Status</h1>
 
-	<div class="row">
-		<div id="status" class="col-md-8"></div>
-		<div class="col-md-4">
-			<div class="panel panel-default">
-				<div class="panel-heading">Add a task
-				</div>
-				<div class="panel-body">
-					<form class="form-horizontal" id="task_form">
-
-						<div class="form-group">
-							<label for="task_id" class="col-sm-2 control-label">task_id</label>
-
-							<div class="col-sm-10">
-								<input type="text" class="form-control" value="de305d54-75b4-431b-adb2-eb6b9e546013"
-									   id="task_id"/>
-							</div>
-						</div>
-						<div class="form-group">
-							<label for="test_id" class="col-sm-2 control-label">test_id</label>
-
-							<div class="col-sm-10">
-								<input type="text" class="form-control" value="de305d54-75b4-431b-adb2-eb6b9e546013"
-									   id="test_id"/>
-							</div>
-						</div>
-						<div class="form-group">
-							<label for="task_type" class="col-sm-2 control-label">task_type</label>
-
-							<div class="col-sm-10">
-								<input type="text" class="form-control" value="wait" id="task_type"/>
-							</div>
-						</div>
-						<div class="form-group">
-							<label for="task_version" class="col-sm-2 control-label">task_version</label>
-
-							<div class="col-sm-10">
-								<input type="text" class="form-control" value="1" id="task_version"/>
-							</div>
-						</div>
-						<div class="form-group">
-							<label for="task_data" class="col-sm-2 control-label">task_data</label>
-
-							<div class="col-sm-10">
-								<textarea class="form-control" id="task_data">{}</textarea>
-							</div>
-						</div>
-
-						<div class="form-group">
-							<div class="col-sm-offset-2 col-sm-10">
-
-								<input type="submit" id="task_submit" class="btn btn-default" value="Submit"/>
-							</div>
-						</div>
-					</form>
-				</div>
+<nav class="navbar navbar-default">
+	<div class="container">
+		<div class="navbar-header"><a class="navbar-brand" href="#">SLAMon Status</a></div>
+		<form class="navbar-form navbar-right" role="search">
+			<div class="input-group">
+				<input id="search-input" type="text" class="form-control" placeholder="Search">
+				<span class="input-group-btn">
+					<button id="search-task-button" class="btn btn-default" type="button">Task</button>
+					<button id="search-test-button" class="btn btn-default" type="button">Test</button>
+				</span>
 			</div>
-		</div>
+			<button id="add-task-button" type="button" class="btn btn-default"><span class="glyphicon glyphicon-plus" aria-hidden="true"></span> Add a task</button>
+		</form>
 	</div>
+</nav>
 
+<div id="status">
 </div>
 
+<div class="modal fade" id="add-modal">
+	<div class="modal-dialog">
+		<div class="modal-content">
+			<form class="form-horizontal" id="task_form">
+				<div class="modal-header"><h4>Add a task</h4></div>
+				<div class="modal-body">
+
+					<div class="form-group">
+						<label for="task_id" class="col-sm-2 control-label">task_id</label>
+
+						<div class="col-sm-10">
+							<input type="text" class="form-control" value="de305d54-75b4-431b-adb2-eb6b9e546013"
+								   id="task_id"/>
+						</div>
+					</div>
+					<div class="form-group">
+						<label for="test_id" class="col-sm-2 control-label">test_id</label>
+
+						<div class="col-sm-10">
+							<input type="text" class="form-control" value="de305d54-75b4-431b-adb2-eb6b9e546013"
+								   id="test_id"/>
+						</div>
+					</div>
+					<div class="form-group">
+						<label for="task_type" class="col-sm-2 control-label">task_type</label>
+
+						<div class="col-sm-10">
+							<input type="text" class="form-control" value="wait" id="task_type"/>
+						</div>
+					</div>
+					<div class="form-group">
+						<label for="task_version" class="col-sm-2 control-label">task_version</label>
+
+						<div class="col-sm-10">
+							<input type="text" class="form-control" value="1" id="task_version"/>
+						</div>
+					</div>
+					<div class="form-group">
+						<label for="task_data" class="col-sm-2 control-label">task_data</label>
+
+						<div class="col-sm-10">
+							<textarea class="form-control" id="task_data">{}</textarea>
+						</div>
+					</div>
+
+				</div>
+				<div class="modal-footer">
+					<input type="submit" id="task_submit" class="btn btn-default" value="Submit"/>
+				</div>
+			</form>
+		</div>
+	</div>
+</div>
 
 <script src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
@@ -101,48 +138,344 @@
 <script type="text/jsx">
 	var ReactCSSTransitionGroup = React.addons.CSSTransitionGroup;
 
+	function filtersData(filters) {
+		if (filters) { return {"q": JSON.stringify({"filters": filters})} }
+		return filters;
+	}
+
+	var ModalMixin = {
+		componentDidMount: function () {
+			// add event to remove element when hided
+			$(React.findDOMNode(this)).modal().on('hidden.bs.modal', function (e) {
+				$(React.findDOMNode(this)).remove();
+			}.bind(this));
+		}
+	};
+
+	var JsonStateMixin = {
+		getInitialState: function () {
+			return {};
+		},
+		loadState: function () {
+			// fetch complete task object using /api
+			$.getJSON(this.stateUrl()).done(function (json) {
+				this.setState(json);
+			}.bind(this)).fail(function (json, error, e) {
+				this.setState({stateError: e});
+			}.bind(this));
+		},
+		componentDidMount: function () {
+			// fetch complete task object using /api
+			this.loadState();
+		}
+	};
+
+	/**
+	 * Mixin class to provide React class an ability to continuously poll for status updates
+	 * using a list of URLs.
+	 */
+	var RequestLoopMixin = {
+		_loopOptions: {interval: 5000, urls: []},
+		loadStatus: function () {
+			// Build a chain of $.getJSON requests, each triggering the next one once completed.
+			// The last one in the chain will schedule a timeout to launch the from the beginning.
+			this._loopOptions.urls.reduceRight(function (nextInChain, url) {
+				return function () { $.getJSON(url[0], url[1]).done(url[2]).always(nextInChain); }
+			}, setTimeout.bind(window, this.loadStatus, this._loopOptions.interval))();
+		},
+		addStatusUrl: function(url, filters, callback) {
+			this._loopOptions.urls.push([url, filtersData(filters), callback]);
+			return this;
+		}
+	};
+
+	var Alert = React.createClass({
+		render: function () {
+			if (this.props.error) {
+				return (<div className="alert alert-danger" role="alert">{this.props.error}</div>);
+			}
+			return (<div></div>);
+		}
+	});
+
+	/** Modal details panel for a Task. */
+	var TaskDetails = React.createClass({
+		mixins: [ModalMixin, JsonStateMixin],
+		stateUrl: function () {
+			return '/api/tasks/'+this.props.task;
+		},
+		iconClass: function () {
+			if (this.state.completed) {
+				return "glyphicon glyphicon-ok text-success";
+			} else if (this.state.failed) {
+				return "glyphicon glyphicon-alert text-danger";
+			}
+			return "glyphicon glyphicon-time";
+		},
+		render: function () {
+			return (
+					<div className="modal fade">
+						<div className="modal-dialog">
+							<div className="modal-content">
+								<div className="modal-header">
+									<button type="button" className="close" data-dismiss="modal" aria-label="Close">
+										<span aria-hidden="true">&times;</span>
+									</button>
+									<h4 className="modal-title">{this.state.uuid}</h4>
+								</div>
+								<div className="modal-body">
+									<Alert error={this.state.stateError}/>
+									<div className="container-fluid">
+										<div className="row">
+											<div className="col-xs-3"><strong>Task type</strong></div>
+											<div className="col-xs-9">{this.state.type} ({this.state.version})</div>
+										</div>
+										<div className="row">
+											<div className="col-xs-3"><strong>Created</strong></div>
+											<div className="col-xs-9">{this.state.created}</div>
+										</div>
+										<div className="row">
+											<div className="col-xs-3"><strong>Claimed</strong></div>
+											<div className="col-xs-9">{this.state.claimed}</div>
+										</div>
+										<div className="row">
+											<div className="col-xs-3"><strong>Completion</strong></div>
+											<div className="col-xs-9">
+												{this.state.completed || this.state.failed}
+												&nbsp;
+												<span className={this.iconClass()} aria-hidden="true"></span>
+											</div>
+										</div>
+										<div className="row">
+											<div className="col-xs-3"><strong>Test ID</strong></div>
+											<div className="col-xs-9">{this.state.test_id}</div>
+										</div>
+										<div className="row">
+											<div className="col-sm-3"><strong>Input</strong></div>
+											<div className="col-sm-9"><pre>{JSON.stringify(this.state.data, null, 2)}</pre></div>
+										</div>
+										<div className="row">
+											<div className="col-sm-3"><strong>Output</strong></div>
+											<div className="col-sm-9"><pre>{JSON.stringify(this.state.result_data || this.state.error, null, 2)}</pre></div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+			);
+		}
+	});
+
+	/** Open task details panel */
+	function showTaskDetails(taskId) {
+		React.render(<TaskDetails task={taskId}/>, $("<div>").appendTo("body")[0]);
+	}
+
 	var Task = React.createClass({
 		_getClass: function () {
-			if (this.props.task.task_completed) {
+			if (this.props.task.completed) {
 				return "success";
-			} else if (this.props.task.task_failed) {
+			} else if (this.props.task.failed) {
 				return "danger";
 			}
 			return "";
 		},
-		_resultContent: function () {
-			return '<p><b>Completion</b><br/>' + (this.props.task.task_completed || this.props.task.task_failed) + '</p>' +
-					'<p><b>Test</b><br/>' + (this.props.task.test_id) + '</p>' +
-					'<p><b>Result</b><pre>' + (this.props.task.task_result || this.props.task.task_error) + '</pre></p>';
-		},
-		componentDidMount: function () {
-			$(React.findDOMNode(this)).popover({trigger: 'hover', html: true});
+		onClick: function () {
+			showTaskDetails(this.props.task.uuid);
 		},
 		render: function () {
 			return (
-					<tr className={this._getClass()}
-						data-placement="bottom"
-						data-toggle="popover"
-						title="Task result"
-						data-content={this._resultContent()}>
-						<td>{this.props.task.task_type} ({this.props.task.task_version})</td>
-						<td>{this.props.task.task_id}</td>
+					<tr className={this._getClass()} title="Task result" onClick={this.onClick}>
+						<td><span>{this.props.task.type} ({this.props.task.version})</span></td>
+						<td><span>{this.props.task.uuid}</span></td>
+						<td><span>{this.props.task.created}</span></td>
 					</tr>
 			);
 		}
 	});
 
+	/** Render a list of tasks as a table. */
 	var TaskList = React.createClass({
 		render: function () {
 			return (
+					<div className="task-list">
+						<table className="table">
+							<thead>
+								<th width="20%">Task</th>
+								<th>UUID</th>
+								<th>Created</th>
+							</thead>
+							<ReactCSSTransitionGroup component="tbody" transitionName="row">
+								{this.props.tasks.map(function (task, i) {
+									return (<Task key={task.uuid} task={task}> {task}</Task>);
+								}.bind(this))}
+							</ReactCSSTransitionGroup>
+						</table>
+					</div>
+			);
+		}
+	});
+
+	var TestDetails = React.createClass({
+		mixins: [ModalMixin, JsonStateMixin],
+		stateUrl: function () {
+			return '/status/tasks?' + $.param(filtersData([{"name": "test_id", "op": "equals", "val": this.props.testId}]));
+		},
+		render: function () {
+			return (
+					<div className="modal fade">
+						<div className="modal-dialog">
+							<div className="modal-content">
+								<div className="modal-header">
+									<button type="button" className="close" data-dismiss="modal" aria-label="Close">
+										<span aria-hidden="true">&times;</span>
+									</button>
+									<h4 className="modal-title">Test: {this.props.testId}</h4>
+								</div>
+								<div className="modal-body">
+									<Alert error={this.state.stateError}/>
+									<div className="container-fluid">
+										<TaskList tasks={this.state.objects || []}/>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+			);
+		}
+	});
+
+	function showTestDetails(testId) {
+		React.render(<TestDetails testId={testId}/>, $("<div>").appendTo("body")[0]);
+	}
+
+	var AgentTasksList = React.createClass({
+		mixins: [JsonStateMixin],
+		stateUrl: function () {
+			return '/status/tasks?' + $.param(filtersData([{
+						"name": "assigned_agent_uuid",
+						"op": "equals",
+						"val": this.props.agentId
+					}]));
+		},
+		render: function () {
+			return (
+					<div className="container-fluid">
+						<h4>Tasks</h4>
+						<Alert error={this.state.stateError}/>
+						<TaskList tasks={this.state.objects || []}/>
+					</div>
+			);
+		}
+	});
+
+	var AgentDetails = React.createClass({
+		mixins: [ModalMixin, JsonStateMixin],
+		stateUrl: function () {
+			return '/api/agents/' + this.props.agentId;
+		},
+		render: function () {
+			return (
+					<div className="modal fade">
+						<div className="modal-dialog">
+							<div className="modal-content">
+								<div className="modal-header">
+									<button type="button" className="close" data-dismiss="modal" aria-label="Close">
+										<span aria-hidden="true">&times;</span>
+									</button>
+									<h4 className="modal-title">Agent: {this.props.agentId}</h4>
+								</div>
+								<div className="modal-body">
+									<Alert error={this.state.stateError}/>
+
+									<div className="container-fluid">
+										<div className="row">
+											<div className="col-xs-3">
+												<strong>Name</strong>
+											</div>
+											<div className="col-xs-9">{this.state.name}</div>
+										</div>
+										<div className="row">
+											<div className="col-xs-3">
+												<strong>Last seen</strong>
+											</div>
+											<div className="col-xs-9">{this.state.last_seen}</div>
+										</div>
+										<div className="row">
+											<div className="col-xs-3">
+												<strong>Capabilities</strong>
+											</div>
+											<div className="col-xs-9">
+												{(this.state.capabilities || []).map(function (capability, i) {
+													return (<span>
+														<span className="label label-default">{capability.type + ": " + capability.version}</span>
+														{' '}
+													</span>);
+												}.bind(this))}
+											</div>
+										</div>
+									</div>
+									<AgentTasksList agentId={this.props.agentId || []}/>
+								</div>
+							</div>
+						</div>
+					</div>
+			);
+		}
+	});
+
+	function showAgentDetails(agentId) {
+		React.render(<AgentDetails agentId={agentId}/>, $("<div>").appendTo("body")[0]);
+	}
+
+	/** Render an agent instance. */
+	var Agent = React.createClass({
+		onClick: function () {
+			showAgentDetails(this.props.agent.uuid);
+		},
+		render: function () {
+			var sum = this.props.agent.tasks_summary;
+			return (
+					<tr onClick={this.onClick}>
+						<td>
+							<span>{this.props.agent.name}</span>
+						</td>
+						<td>
+							<span>{this.props.agent.uuid}</span>
+						</td>
+						<td>
+							<span>{this.props.agent.last_seen}</span>
+						</td>
+						<td title="Pending">
+							<span className="label label-default">{sum.assigned - sum.completed - sum.failed}</span>
+						</td>
+						<td title="Handled">
+							<span className="label label-success">{sum.completed}</span>
+						</td>
+						<td title="Error">
+							<span className="label label-danger">{sum.failed}</span>
+						</td>
+					</tr>
+			);
+		}
+	});
+
+	/** Render a list of agents */
+	var AgentList = React.createClass({
+		render: function () {
+			return (
+
 					<table className="table">
 						<thead>
-							<th>Task</th>
-							<th>Task ID</th>
+							<th width="20%">Agent</th>
+							<th>UUID</th>
+							<th>Last seen</th>
+							<th width="20%" colSpan="3">Tasks</th>
 						</thead>
 						<ReactCSSTransitionGroup component="tbody" transitionName="row">
-							{this.props.tasks.map(function (task, i) {
-								return (<Task key={task.agent_id} task={task}> {task}</Task>);
+							{this.props.agents.map(function (agent, i) {
+								return (<Agent key={agent.uuid} agent={agent}> {agent}</Agent>);
 							}.bind(this))}
 						</ReactCSSTransitionGroup>
 					</table>
@@ -150,87 +483,85 @@
 		}
 	});
 
-	var Agent = React.createClass({
-		render: function () {
-			return (
-					<div className="panel panel-default">
-						<div className="panel-heading">{this.props.agent.agent_name} ({this.props.agent.agent_id})</div>
-						<TaskList tasks={this.props.agent.tasks}/>
-					</div>
-			);
-		}
-	});
-
-	var AgentList = React.createClass({
-		render: function () {
-			return (
-					<div>
-						<ReactCSSTransitionGroup component="div" transitionName="row">
-							{this.props.agents.map(function (agent, i) {
-								return (<Agent key={agent.agent_id} agent={agent}> {agent}</Agent>);
-							}.bind(this))}
-						</ReactCSSTransitionGroup>
-					</div>
-			);
-		}
-	});
-
+	/** Render the status view containing both pending tasks and agents. */
 	var Status = React.createClass({
+		mixins: [RequestLoopMixin],
 		componentDidMount: function () {
-			console.log('Loading data from %s', this.props.source);
-			setInterval(function () {
-				$.getJSON(this.props.source).success(function (json) {
-					this.setState(json);
-				}.bind(this));
-			}.bind(this), 1000);
-
+			this.addStatusUrl(
+					'/status/tasks', null,
+					function (json) {
+						this.setState({tasks: json.objects});
+					}.bind(this)
+			).addStatusUrl(
+					'/status/agents', null,
+					function (json) {
+						this.setState({agents: json.objects});
+					}.bind(this)
+			).loadStatus();
 		},
 		getInitialState: function () {
 			return {tasks: [], agents: []};
 		},
 		render: function () {
 			return (
-					<div className="row">
-						<div className="col-md-6">
-							<div className="panel panel-default">
-								<div className="panel-heading">Pending tasks</div>
-								<TaskList tasks={this.state.tasks}></TaskList>
-							</div>
-						</div>
-						<div className="col-md-6">
-							<AgentList agents={this.state.agents}></AgentList>
-						</div>
+					<div className="container">
+						<h3>Pending tasks</h3>
+						<TaskList tasks={this.state.tasks}></TaskList>
+						<h3>Agents</h3>
+						<AgentList agents={this.state.agents}></AgentList>
 					</div>
 			);
 		}
 	});
 
-	React.render(<Status source="/dashboard/status"/>, $("#status")[0]);
+	// Apply the status view
+	React.render(<Status source="/status/tasks"/>, $("#status")[0]);
+
+	function randomizeTaskId() {
+		function guid() {
+			function s4() {
+				return Math.floor((1 + Math.random()) * 0x10000)
+						.toString(16)
+						.substring(1);
+			}
+
+			return s4() + s4() + '-' + s4() + '-' + s4() + '-' +
+					s4() + '-' + s4() + s4() + s4();
+		}
+		$("#task_id").val(guid());
+	}
 
 	$("#task_form").submit(function (e) {
 		e.stopPropagation();
 		var values = {
-			'task_id': $("#task_id").val(),
+			'uuid': $("#task_id").val(),
 			'test_id': $("#test_id").val(),
-			'task_type': $("#task_type").val(),
-			'task_version': parseInt($("#task_version").val()),
-			'task_data': JSON.parse($("#task_data").val())
+			'type': $("#task_type").val(),
+			'version': parseInt($("#task_version").val()),
+			'data': JSON.parse($("#task_data").val())
 		};
 		$("#task_form .form-group").removeClass('has-error');
 		$("#task_form input,textarea").attr('disabled', true);
-		console.log(values);
-		$.ajax('/task', {
+		$.ajax('/api/tasks', {
 			data: JSON.stringify(values),
 			contentType: 'application/json',
 			type: 'POST'
 		}).done(function () {
 			$("#task_form input,textarea").attr('disabled', false);
+			$("#add-modal").modal("hide");
 		}).error(function () {
 			$("#task_form input,textarea").attr('disabled', false);
 			$("#task_form .form-group").addClass('has-error');
 		});
 		return false;
 	});
+	$("#add-modal").modal({show: false});
+	$("#add-task-button").click(function () {
+		randomizeTaskId();
+		$("#add-modal").modal("show");
+	});
+	$("#search-test-button").click(function() { showTestDetails($("#search-input").val()); });
+	$("#search-task-button").click(function() { showTaskDetails($("#search-input").val()); });
 </script>
 
 </body>

@@ -1,10 +1,13 @@
 from datetime import datetime
+import json
 
 from flask import current_app
 from flask.ext.sqlalchemy import SQLAlchemy
-from sqlalchemy import Column, Integer, CHAR, DateTime, String, ForeignKey, PrimaryKeyConstraint, Unicode, and_
+from sqlalchemy import Column, Integer, CHAR, DateTime, String, ForeignKey, PrimaryKeyConstraint, Unicode, and_, \
+    TypeDecorator
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy import func
 
 db = SQLAlchemy()
 
@@ -60,6 +63,21 @@ class Agent(db.Model):
                 )
             )
 
+    def tasks_summary(self):
+        """
+        Fetch summary of tasks assigned and handled by the agent.
+
+        :return: A dict containing keys 'assigned', 'completed' and 'error'.
+        """
+        return dict(zip(
+            ('assigned', 'completed', 'failed'),
+            db.session.query(
+                func.count(Task.uuid),
+                func.count(Task.completed),
+                func.count(Task.failed)
+            ).filter(Task.assigned_agent_uuid == self.uuid).one()
+        ))
+
     @staticmethod
     def drop_inactive(last_seen_threshold):
         """
@@ -98,6 +116,22 @@ class AgentCapability(db.Model):
     __table_args__ = (PrimaryKeyConstraint(agent_uuid, type, version),)
 
 
+class JSONEncodedDict(TypeDecorator):
+    impl = String
+
+    def process_bind_param(self, value, dialect):
+        del dialect  # unused argument provided by SQLAlchemy
+        if value is not None:
+            value = json.dumps(value)
+        return value
+
+    def process_result_value(self, value, dialect):
+        del dialect  # unused argument provided by SQLAlchemy
+        if value is not None:
+            value = json.loads(value)
+        return value
+
+
 class Task(db.Model):
     __tablename__ = 'tasks'
 
@@ -107,13 +141,13 @@ class Task(db.Model):
     version = Column('version', Integer)
 
     # Data that goes to agent with the task
-    data = Column('data', String)  # TODO - use json blob with psql
+    data = Column('data', JSONEncodedDict)
     # Data that was returned from agent
-    result_data = Column('result_data', String)  # TODO - use json blob with psql
+    result_data = Column('result_data', JSONEncodedDict)
 
     # Agent that has been assigned to take care of the task - NULL if not claimed yet
     assigned_agent_uuid = Column('assigned_agent_uuid', ForeignKey('agents.uuid', ondelete='SET NULL'))
-    assigned_agent = relationship(Agent, backref="tasks")
+    assigned_agent = relationship(Agent, backref=backref("tasks", lazy='dynamic'))
 
     # When was the task added
     created = Column('created', DateTime, default=datetime.utcnow, nullable=False)
@@ -135,7 +169,7 @@ class Task(db.Model):
         :param max_tasks: Maximum number of tasks to assign
         :return: A generator enumerating assigned tasks
         """
-        query = db.session.query(AgentCapability, Task).\
+        query = db.session.query(AgentCapability, Task). \
             filter(and_(Task.assigned_agent_uuid.is_(None), Task.completed.is_(None), Task.error.is_(None))). \
             filter(AgentCapability.agent_uuid == agent.uuid). \
             filter(and_(AgentCapability.type == Task.type, AgentCapability.version == Task.version))

@@ -1,5 +1,3 @@
-import json
-
 import jsonschema
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.exc import IntegrityError, ProgrammingError
@@ -61,7 +59,7 @@ def post_task():
     )
 
     if 'task_data' in data:
-        task_data = json.dumps(data['task_data'])
+        task_data = data['task_data']
         task.data = task_data
 
     try:
@@ -80,7 +78,7 @@ def post_task():
     current_app.logger.info("Task posted by BPMS - Task's type: {}, test process id: {}, uuid: {}, parameters: {}"
                             .format(task_type, task_test_id, task_uuid, task_data))
 
-    return ('', 200)
+    return '', 200
 
 
 @blueprint.route('/task/<uuid:task_uuid>', methods=['GET'], strict_slashes=False)
@@ -114,14 +112,14 @@ def get_task(task_uuid):
         }
 
         if task.data is not None:
-            task_desc['task_data'] = json.loads(task.data)
+            task_desc['task_data'] = task.data
 
         if task.failed:
             task_desc['task_failed'] = str(task.failed)
             task_desc['task_error'] = str(task.error)
         elif task.completed:
             task_desc['task_completed'] = str(task.completed)
-            task_desc['task_result'] = json.loads(task.result_data)
+            task_desc['task_result'] = task.result_data
 
         return jsonify(task_desc)
 
