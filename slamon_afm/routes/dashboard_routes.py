@@ -10,10 +10,11 @@ manager = APIManager(flask_sqlalchemy_db=db)
 blueprint = Blueprint('testing', __name__)
 
 
-def task_get_many_preprocessor(search_params=None, **kw):
+def task_get_many_preprocessor(search_params=None, **unused):
     """
     By default, list only pending tasks ordered by creation time.
     """
+    del unused  # unused arguments provided by Flask-restless
     if 'filters' not in search_params:
         search_params['filters'] = [{'and': [{'name': 'assigned_agent_uuid', 'op': 'is_null'},
                                              {'name': 'completed', 'op': 'is_null'},
@@ -22,10 +23,11 @@ def task_get_many_preprocessor(search_params=None, **kw):
         search_params['order_by'] = [{'field': 'created', 'direction': 'desc'}]
 
 
-def agent_get_many_preprocessor(search_params=None, **kw):
+def agent_get_many_preprocessor(search_params=None, **unused):
     """
     By default order agents by uuid
     """
+    del unused  # unused arguments provided by Flask-restless
     if 'order_by' not in search_params:
         search_params['order_by'] = [{'field': 'uuid', 'direction': 'asc'}]
 

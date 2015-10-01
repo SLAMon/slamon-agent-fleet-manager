@@ -52,11 +52,13 @@ def run_afm(app, args):
 
 
 def create(app, args):
+    del args  # unused
     with app.app_context():
         db.create_all()
 
 
 def drop(app, args):
+    del args  # unused
     with app.app_context():
         db.drop_all()
 

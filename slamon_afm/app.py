@@ -85,6 +85,7 @@ def create_app(config=None, config_file=None):
 
     # register event listener to enable foreign_keys for SQLite databases
     def on_connect(conn, record):
+        del record  # unused, provided by SQLAlchemy
         if db.engine.name == 'sqlite':
             conn.execute('pragma foreign_keys=ON')
 
