@@ -8,7 +8,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.exc import SQLAlchemyError
 from dateutil import tz
 
-from slamon_afm.models import db, Agent, Task
+from slamon_afm.models import db, Agent, Task, TaskException
 
 blueprint = Blueprint('agent', __name__)
 
@@ -192,25 +192,19 @@ def post_tasks():
         current_app.logger.error("Invalid protocol in task response: {0}".format(protocol))
         abort(400)
 
-    result = ""
     try:
         task = db.session.query(Task).filter(Task.uuid == str(task_id)).one()
 
-        if task.claimed is None or (task.completed is not None or task.failed is not None):
-            current_app.logger.error("Incomplete task posted!")
-            abort(400)
-
-        if 'task_data' in data:
-            task.result_data = data['task_data']
-            task.completed = datetime.utcnow()
-            result = task.result_data
-        elif 'task_error' in data:
-            task.error = data['task_error']
-            task.failed = datetime.utcnow()
-            result = task.error
+        task.complete(
+            result_data=data['task_data'] if 'task_data' in data else None,
+            error=data['task_error'] if 'task_error' in data else None
+        )
 
         db.session.add(task)
         db.session.commit()
+    except TaskException as e:
+        current_app.logger.exception("Could not complete task {}".format(e.task.uuid))
+        abort(400)
     except NoResultFound:
         current_app.logger.error("No matching task in for task response!")
         abort(400)
@@ -218,8 +212,5 @@ def post_tasks():
         db.session.rollback()
         current_app.logger.error("Failed to commit database changes for task result POST")
         abort(500)
-
-    current_app.logger.info("An agent returned task with results - uuid: {}".format(task_id))
-    current_app.logger.debug("Task results: {}".format(result))
 
     return '', 200

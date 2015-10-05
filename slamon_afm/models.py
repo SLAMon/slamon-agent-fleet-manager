@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import Enum
 import json
 
 from flask import current_app
@@ -7,9 +8,23 @@ from sqlalchemy import Column, Integer, CHAR, DateTime, String, ForeignKey, Prim
     TypeDecorator
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm.exc import NoResultFound
-from sqlalchemy import func
+from sqlalchemy import func, event
 
 db = SQLAlchemy()
+
+from slamon_afm.stats import statsd
+
+
+class TaskException(Exception):
+    task = None
+
+    def __init__(self, *args, task=None):
+        super(TaskException, self).__init__(*args)
+        self.task = task
+
+
+class IllegalStateException(TaskException):
+    pass
 
 
 class Agent(db.Model):
@@ -131,6 +146,15 @@ class JSONEncodedDict(TypeDecorator):
             value = json.loads(value)
         return value
 
+class TaskEvent(Enum):
+    posted = 'posted'
+    claimed = 'claimed'
+    completed = 'completed'
+    error = 'error'
+
+    def __str__(self):
+        return self.value
+
 
 class Task(db.Model):
     __tablename__ = 'tasks'
@@ -160,6 +184,55 @@ class Task(db.Model):
     # Error message that should only be present if failed is set
     error = Column('error', Unicode, nullable=True)
 
+    def send_stats(self, task_event):
+        """Increase stats counters/timers for both total and per task type"""
+        statsd.incr("tasks.{}".format(task_event))
+        if task_event is not TaskEvent.posted:
+            statsd.timing(
+                "tasks.{}.{}.{}".format(self.type, self.version, task_event),
+                int((datetime.now() - self.created).total_seconds() * 1000)
+            )
+        else:
+            statsd.incr("tasks.{}.{}.{}".format(self.type, self.version, task_event))
+
+    def claim(self, agent):
+        """
+        Mark task as claimed and post stats to statsd.
+        Note that to prevent tasks being assigned to multiple agent, the task
+        should be selected with *FOR UPDATE* statement.
+
+        :param agent: The agent the task is being assigned to
+        """
+        current_app.logger.info("Claiming task {} for agent {}".format(self.uuid, agent.uuid))
+        self.send_stats(TaskEvent.claimed)
+        self.assigned_agent_uuid = agent.uuid
+        self.claimed = datetime.utcnow()
+
+    def complete(self, result_data=None, error=None):
+        """
+        Mark task as completed, save results and send stats to statsd.
+
+        :param result_data: Task result data when successfully completed
+        :param error: Task error when completed with an error
+        """
+        if self.completed or self.failed:
+            raise IllegalStateException("Cannot complete a tasks that is already completed!", task=self)
+        elif not self.claimed:
+            raise IllegalStateException("Cannot complete a task that was never claimed!", task=self)
+        elif result_data is not None:
+            self.completed = datetime.utcnow()
+            self.result_data = result_data
+            current_app.logger.info("Task {} completed".format(self.uuid))
+            self.send_stats(TaskEvent.completed)
+            return
+        elif error is not None:
+            self.failed = datetime.utcnow()
+            self.error = error
+            current_app.logger.warn("Task {} completed with error".format(self.uuid))
+            self.send_stats(TaskEvent.error)
+            return
+        raise TaskException("Attempt to complete task neither with results nor errors", task=self)
+
     @staticmethod
     def claim_tasks(agent, max_tasks):
         """
@@ -178,9 +251,7 @@ class Task(db.Model):
 
         # Assign available tasks to the agent and mark them as being in process
         for _, task in query[0:max_tasks]:
-            current_app.logger.info("Claiming task {} for agent {}".format(task.uuid, agent.uuid))
-            task.assigned_agent_uuid = agent.uuid
-            task.claimed = datetime.utcnow()
+            task.claim(agent)
             yield task
 
     @staticmethod
@@ -198,3 +269,15 @@ class Task(db.Model):
             },
             synchronize_session=False
         )
+
+
+@event.listens_for(Task, 'after_insert')
+def receive_after_insert(mapper, connection, task):
+    del mapper, connection  # unused
+    task.send_stats('posted')
+
+
+@event.listens_for(Task, 'after_delete')
+def receive_after_delete(mapper, connection, task):
+    del mapper, connection  # unused
+    task.send_stats('deleted')
