@@ -29,7 +29,7 @@ POST_TASK_SCHEMA = {
             'pattern': '^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$'
         }
     },
-    'required': ['task_id', 'task_type', 'task_version', 'test_id'],
+    'required': ['task_id', 'task_type', 'task_version', 'test_id', 'task_data'],
     'additionalProperties': False
 }
 
@@ -46,37 +46,21 @@ def post_task():
     except jsonschema.ValidationError:
         abort(400)
 
-    task_uuid = str(data['task_id'])
-    task_type = str(data['task_type'])
-    task_test_id = (data['test_id'])
-    task_data = ""
-
     task = Task(
-        uuid=task_uuid,
-        type=task_type,
+        uuid=str(data['task_id']),
+        type=str(data['task_type']),
         version=int(data['task_version']),
-        test_id=task_test_id
+        test_id=str(data['test_id']),
+        data=data['task_data']
     )
-
-    if 'task_data' in data:
-        task_data = data['task_data']
-        task.data = task_data
 
     try:
         db.session.add(task)
-    except IntegrityError:
-        db.session.rollback()
-        abort(400)
-
-    try:
         db.session.commit()
     except (IntegrityError, ProgrammingError):
         db.session.rollback()
-        current_app.logger.error("Failed to commit database changes for BPMS task POST")
+        current_app.logger.exception("Failed to commit database changes for BPMS task POST")
         abort(400)
-
-    current_app.logger.info("Task posted by BPMS - Task's type: {}, test process id: {}, uuid: {}, parameters: {}"
-                            .format(task_type, task_test_id, task_uuid, task_data))
 
     return '', 200
 
