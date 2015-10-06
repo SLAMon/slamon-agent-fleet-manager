@@ -255,13 +255,6 @@ class TaskStatsTests(AFMTest):
             incr_mock.assert_called_once_with('tasks.error')
             timing_mock.assert_called_once_with('tasks.task-type-1.1.error', ANY)
 
-    def testCapabilitySummarySimple(self):
-        summary = list(AgentCapability.summary())
-        self.assertEqual(len(summary), 1)
-        self.assertEqual(summary[0]['count'], 1)
-        self.assertEqual(summary[0]['type'], 'task-type-1')
-        self.assertEqual(summary[0]['version'], 1)
-
     def testCapabilitySummary(self):
         # add three more agents, with different last seen values
         for agent in range(3):
@@ -319,4 +312,39 @@ class TaskStatsTests(AFMTest):
                 call('capability.task-type-1.1', 2),
                 call('capability.task-type-1.2', 1),
                 call('capability.task-type-2.3', 1)
+            ], any_order=True)
+
+    def testTaskSummary(self):
+        # put some tasks in the queue
+        for task_type, version in (('type1', 1), ('type2', 1), ('type1', 1), ('type2', 2)):
+            self._addTask(
+                uuid=str(uuid4()),
+                type=task_type,
+                version=version
+            )
+        # add already completed tasks and claimed tasks, should be included in queue stats with zero value
+        self._addTask(uuid=str(uuid4()), completed=datetime.utcnow(), result_data={})
+        self._addTask(uuid=str(uuid4()), failed=datetime.utcnow(), error='test')
+        self._addTask(uuid=str(uuid4()), claimed=datetime.utcnow(), assigned_agent=self.agent)
+
+        # check queue summary data
+        summary = list(Task.task_summary())
+        self.assertEqual(len(summary), 4, "there should be four entries of different types!")
+        self.assertEqual(len(set(t['type'] for t in summary)), 3, "there should three kinds of types")
+        self.assertEqual(len(set((t['type'], t['version']) for t in summary)), 4,
+                         "there should be four distinct capability,version pairs")
+
+        # publish queue & processing gauges with statsd
+        with patch.object(statsd, 'gauge', return_value=None) as mock_method:
+            Task.update_gauges()
+            self.assertEqual(mock_method.call_count, 8)
+            mock_method.assert_has_calls([
+                call('tasks.type1.1.queue', 2),
+                call('tasks.type2.1.queue', 1),
+                call('tasks.type2.2.queue', 1),
+                call('tasks.task-type-1.1.queue', 0),
+                call('tasks.type1.1.processing', 0),
+                call('tasks.type2.1.processing', 0),
+                call('tasks.type2.2.processing', 0),
+                call('tasks.task-type-1.1.processing', 1)
             ], any_order=True)

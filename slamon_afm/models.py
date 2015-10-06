@@ -8,7 +8,7 @@ from sqlalchemy import Column, Integer, CHAR, DateTime, String, ForeignKey, Prim
     TypeDecorator
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm.exc import NoResultFound
-from sqlalchemy import func, event
+from sqlalchemy import func, event, case, literal_column
 
 db = SQLAlchemy()
 
@@ -251,6 +251,27 @@ class Task(db.Model):
             self.send_stats(TaskEvent.error)
             return
         raise TaskException("Attempt to complete task neither with results nor errors", task=self)
+
+    @classmethod
+    def task_summary(cls, filter_criteria=None):
+        """ Summarize task counts in database by task type """
+        queued_criteria = and_(cls.claimed == None, cls.completed == None, cls.failed == None)
+        processing_criteria = and_(cls.claimed != None, cls.completed == None, cls.failed == None)
+        query = db.session.query(cls.type, cls.version,
+                                 func.count(case([(queued_criteria, cls.uuid)], else_=literal_column("NULL"))),
+                                 func.count(case([(processing_criteria, cls.uuid)], else_=literal_column("NULL")))) \
+            .group_by(cls.type, cls.version)
+        if filter_criteria is not None:
+            query = query.filter(filter_criteria)
+        for row in query:
+            yield dict(zip(('type', 'version', 'queued', 'processing'), row))
+
+    @classmethod
+    def update_gauges(cls):
+        """ Publish active task counts to StatsD """
+        for task_type in cls.task_summary():
+            statsd.gauge('tasks.{type}.{version}.queue'.format(**task_type), task_type['queued'])
+            statsd.gauge('tasks.{type}.{version}.processing'.format(**task_type), task_type['processing'])
 
     @staticmethod
     def claim_tasks(agent, max_tasks):
