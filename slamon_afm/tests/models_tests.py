@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from itertools import permutations
-from uuid import UUID, uuid5
-from unittest.mock import patch, ANY
+from uuid import UUID, uuid5, uuid4
+from unittest.mock import patch, ANY, call
 
 from slamon_afm.models import db, Task, Agent, AgentCapability
 from slamon_afm.tests.afm_test import AFMTest
@@ -254,3 +254,69 @@ class TaskStatsTests(AFMTest):
 
             incr_mock.assert_called_once_with('tasks.error')
             timing_mock.assert_called_once_with('tasks.task-type-1.1.error', ANY)
+
+    def testCapabilitySummarySimple(self):
+        summary = list(AgentCapability.summary())
+        self.assertEqual(len(summary), 1)
+        self.assertEqual(summary[0]['count'], 1)
+        self.assertEqual(summary[0]['type'], 'task-type-1')
+        self.assertEqual(summary[0]['version'], 1)
+
+    def testCapabilitySummary(self):
+        # add three more agents, with different last seen values
+        for agent in range(3):
+            db.session.add(Agent(
+                uuid=str(uuid4()),
+                name='test agent 2',
+                last_seen=datetime.utcnow() - timedelta(seconds=agent * 1200),  # 0, 1200, 2400
+                capabilities=[
+                    AgentCapability(type='task-type-1', version=1),
+                    AgentCapability(type='task-type-1', version=2),
+                    AgentCapability(type='task-type-2', version=3)
+                ]
+            ))
+        db.session.flush()
+
+        summary = list(AgentCapability.summary())
+        self.assertEqual(len(summary), 3, "there should be three entries of different capabilities")
+        self.assertEqual(len(set(t['type'] for t in summary)), 2, "there should two kinds of capabilities")
+        self.assertEqual(len(set((t['type'], t['version']) for t in summary)), 3,
+                         "there should be three distinct capability,version pairs")
+        self.assertEqual(sum(t['count'] for t in summary), 10, "there should be four capabilities total available.")
+        counts = {(t['type'], t['version']): t['count'] for t in summary}
+        self.assertEqual(counts[('task-type-1', 1)], 4)
+        self.assertEqual(counts[('task-type-1', 2)], 3)
+        self.assertEqual(counts[('task-type-2', 3)], 3)
+
+        summary = list(AgentCapability.summary(last_seen_threshold=datetime.utcnow() - timedelta(seconds=2000)))
+        counts = {(t['type'], t['version']): t['count'] for t in summary}
+        self.assertEqual(counts[('task-type-1', 1)], 3)
+        self.assertEqual(counts[('task-type-1', 2)], 2)
+        self.assertEqual(counts[('task-type-2', 3)], 2)
+
+    def testIncCapabilityGauges(self):
+        with patch.object(statsd, 'gauge', return_value=None) as mock_method:
+            AgentCapability.update_gauges()
+            mock_method.assert_called_once_with('capability.task-type-1.1', 1)
+
+        self.agent = Agent(
+            uuid='de305d54-75b4-431b-adb2-eb6b9e546014',
+            name='test agent 2',
+            last_seen=datetime.utcnow(),
+            capabilities=[
+                AgentCapability(type='task-type-1', version=1),
+                AgentCapability(type='task-type-1', version=2),
+                AgentCapability(type='task-type-2', version=3)
+            ]
+        )
+        db.session.add(self.agent)
+        db.session.flush()
+
+        with patch.object(statsd, 'gauge', return_value=None) as mock_method:
+            AgentCapability.update_gauges()
+            self.assertEqual(mock_method.call_count, 3)
+            mock_method.assert_has_calls([
+                call('capability.task-type-1.1', 2),
+                call('capability.task-type-1.2', 1),
+                call('capability.task-type-2.3', 1)
+            ], any_order=True)

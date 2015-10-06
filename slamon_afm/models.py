@@ -130,6 +130,25 @@ class AgentCapability(db.Model):
 
     __table_args__ = (PrimaryKeyConstraint(agent_uuid, type, version),)
 
+    @classmethod
+    def summary(cls, last_seen_threshold=None):
+        """
+        Summarize availability of each capability/version pair.
+
+        :param last_seen_threshold: Optionally filter by only agents seen after datetime
+        """
+        query = db.session.query(cls.type, cls.version, func.count(cls.type)).group_by(cls.type, cls.version)
+        if last_seen_threshold is not None:
+            query = query.filter(cls.agent.has(Agent.last_seen >= last_seen_threshold))
+        for row in query:
+            yield dict(zip(('type', 'version', 'count'), row))
+
+    @classmethod
+    def update_gauges(cls):
+        """ Publish capability availability gauges to StatsD """
+        for capability in cls.summary():
+            statsd.gauge('capability.{type}.{version}'.format(**capability), capability['count'])
+
 
 class JSONEncodedDict(TypeDecorator):
     impl = String
