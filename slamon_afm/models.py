@@ -144,9 +144,9 @@ class AgentCapability(db.Model):
             yield dict(zip(('type', 'version', 'count'), row))
 
     @classmethod
-    def update_gauges(cls):
+    def update_gauges(cls, last_seen_threshold=None):
         """ Publish capability availability gauges to StatsD """
-        for capability in cls.summary():
+        for capability in cls.summary(last_seen_threshold=last_seen_threshold):
             statsd.gauge('capability.{type}.{version}'.format(**capability), capability['count'])
 
 

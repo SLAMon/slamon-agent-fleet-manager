@@ -8,7 +8,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.exc import SQLAlchemyError
 from dateutil import tz
 
-from slamon_afm.models import db, Agent, Task, TaskException
+from slamon_afm.models import db, Agent, Task, AgentCapability, TaskException
 
 blueprint = Blueprint('agent', __name__)
 
@@ -124,16 +124,6 @@ def request_tasks():
         current_app.logger.error('Invalid JSON data provided with request.')
         abort(400)
 
-    # cleanup inactive agents
-    if current_app.config['AUTO_CLEANUP']:
-        try:
-            current_app.logger.debug("Cleaning inactive agents...")
-            Agent.drop_inactive(datetime.utcnow() - timedelta(0, current_app.config['AGENT_DROP_THRESHOLD']))
-            Task.update_inactive(datetime.utcnow() - timedelta(0, current_app.config['AGENT_ACTIVE_THRESHOLD']))
-            db.session.commit()
-        except SQLAlchemyError as e:
-            current_app.logger.error("Failed cleaning up inactive agents: {0}".format(e))
-
     protocol = int(data['protocol'])
     agent_uuid = str(data['agent_id'])
     agent_name = str(data['agent_name'])
@@ -150,6 +140,20 @@ def request_tasks():
     agent = Agent.get_agent(agent_uuid, agent_name)
     agent.update_capabilities(agent_capabilities)
     agent.last_seen = datetime.utcnow()
+
+    # cleanup inactive agents
+    if current_app.config['AUTO_CLEANUP']:
+        try:
+            current_app.logger.debug("Cleaning inactive agents...")
+            Agent.drop_inactive(datetime.utcnow() - timedelta(0, current_app.config['AGENT_DROP_THRESHOLD']))
+            Task.update_inactive(datetime.utcnow() - timedelta(0, current_app.config['AGENT_ACTIVE_THRESHOLD']))
+            db.session.commit()
+        except SQLAlchemyError as e:
+            current_app.logger.error("Failed cleaning up inactive agents: {0}".format(e))
+
+    # update gauges for available agent capabilities
+    AgentCapability.update_gauges(
+        last_seen_threshold=datetime.utcnow() - timedelta(0, current_app.config['AGENT_ACTIVE_THRESHOLD']))
 
     # Calculate return time for the agent (next polling time)
     return_time = (datetime.now(tz.tzlocal()) + timedelta(0, current_app.config.get('AGENT_RETURN_TIME'))).isoformat()
