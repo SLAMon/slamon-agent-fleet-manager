@@ -63,6 +63,19 @@ AUTO_CLEANUP              | Run cleanup routines every time an agent requests fo
 LOG_FILE                  | Output log to a file instead of stderr. default=None
 LOG_LEVEL                 | Output log level. default=logging.DEBUG. With environment variables use either integer values or one of the [standard logging level names](https://docs.python.org/3/library/logging.html#levels).
 LOG_FORMAT                | Output log format. default=`'%(asctime)s - %(name)s - %(levelname)s - %(message).120s'`
+STATSD_HOST               | StatsD hostname. defaults=localhost
+STATSD_PORT               | StatsD listening port. default=8125
+STATSD_PREFIX             | Prefix for StatsD stats. default=slamon.afm
+
+### StatsD
+
+slamon-afm will send statistics by default to a StatsD server. The stats include metrics about task throughput and known
+agents:
+
+* timings for task claiming and completion
+* counters for received tasks
+* gauges for currently processing and queued tasks per task type
+* gauges for currently available agents for each task type
 
 
 ### Creating a PostgreSQL database for AFM
