@@ -219,11 +219,11 @@ class TaskStatsTests(AFMTest):
     def testIncClaimedStats(self):
         self._addTask()
 
-        # create list to iterate the generator returned by claim_tasks
         with patch.object(statsd, 'incr', return_value=None) as incr_mock, \
                 patch.object(statsd, 'timing') as timing_mock,\
                 patch.object(statsd, 'gauge') as gauge_mock:
-            _ = list(Task.claim_tasks(self.agent, 1))
+            # create list to iterate the generator returned by claim_tasks
+            list(Task.claim_tasks(self.agent, 1))
             db.session.flush()
 
             incr_mock.assert_called_once_with('tasks.claimed')

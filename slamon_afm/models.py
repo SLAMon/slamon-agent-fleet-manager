@@ -18,8 +18,8 @@ from slamon_afm.stats import statsd
 class TaskException(Exception):
     task = None
 
-    def __init__(self, *args, task=None):
-        super(TaskException, self).__init__(*args)
+    def __init__(self, msg, task=None):
+        super(TaskException, self).__init__(msg)
         self.task = task
 
 

@@ -199,10 +199,7 @@ def post_tasks():
     try:
         task = db.session.query(Task).filter(Task.uuid == str(task_id)).one()
 
-        task.complete(
-            result_data=data['task_data'] if 'task_data' in data else None,
-            error=data['task_error'] if 'task_error' in data else None
-        )
+        task.complete(result_data=data.get('task_data'), error=data.get('task_error'))
 
         db.session.add(task)
         db.session.commit()
