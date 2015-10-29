@@ -56,10 +56,12 @@ class Agent(db.Model):
         Update capabilities of the agent to match the new definitions in agent_capabilities
 
         :param agent_capabilities: A dict describing the new capability set
+        :return: True if any capabilities updated False otherwise
         """
 
         # format capabilities list as a dict of (name,version) pairs
         new_capabilities = {name: int(info['version']) for name, info in agent_capabilities.items()}
+        removed_capabilities = False
 
         # Update existing capabilities
         for capability in self.capabilities:
@@ -68,6 +70,7 @@ class Agent(db.Model):
                 del new_capabilities[capability.type]
             else:
                 self.capabilities.remove(capability)
+                removed_capabilities = True
 
         # Add new capabilities
         for name, version in new_capabilities.items():
@@ -77,6 +80,7 @@ class Agent(db.Model):
                     version=version
                 )
             )
+        return removed_capabilities or len(new_capabilities) > 0
 
     def tasks_summary(self):
         """
@@ -100,23 +104,29 @@ class Agent(db.Model):
         cascades to deassign all claimed tasks.
 
         :param last_seen_threshold: drop agents that have not been seen after this datetime
+        :return: tuple of number of agents, number of tasks affected
         """
 
         # delete agents
-        db.session.query(Agent).filter(Agent.last_seen < last_seen_threshold).delete(synchronize_session=False)
+        count_agents = db.session.query(Agent).filter(Agent.last_seen < last_seen_threshold).delete(
+            synchronize_session=False)
 
-        # mark deassigned tasks as failed. This would be bit more efficient with SQL triggers, but this would
-        # require dialect specific triggers and still maintain this as a fallback when no triggers exists.
-        db.session.query(Task).filter(and_(Task.assigned_agent_uuid == None,
-                                           Task.claimed != None,
-                                           Task.failed == None,
-                                           Task.completed == None)).update(
-            {
-                'failed': datetime.utcnow(),
-                'error': 'Assigned agent reached last seen threshold and is now considered as inactive.'
-            },
-            synchronize_session=False
-        )
+        if count_agents > 0:
+            # mark deassigned tasks as failed. This would be bit more efficient with SQL triggers, but this would
+            # require dialect specific triggers and still maintain this as a fallback when no triggers exists.
+            count_tasks = db.session.query(Task).filter(and_(Task.assigned_agent_uuid == None,
+                                                             Task.claimed != None,
+                                                             Task.failed == None,
+                                                             Task.completed == None)).update(
+                {
+                    'failed': datetime.utcnow(),
+                    'error': 'Assigned agent reached last seen threshold and is now considered as inactive.'
+                },
+                synchronize_session=False
+            )
+
+            return count_agents, count_tasks
+        return 0, 0
 
 
 class AgentCapability(db.Model):
@@ -164,6 +174,7 @@ class JSONEncodedDict(TypeDecorator):
         if value is not None:
             value = json.loads(value)
         return value
+
 
 class TaskEvent(Enum):
     posted = 'posted'
@@ -301,9 +312,10 @@ class Task(db.Model):
         Mark all tasks claimed by agents that have not been seen after defined datetime as failed
 
         :param last_seen_threshold: select tasks claimed by agents not seen after this datetime
+        :return: number of tasks affected
         """
 
-        db.session.query(Task).filter(Task.assigned_agent.has(Agent.last_seen < last_seen_threshold)).update(
+        return db.session.query(Task).filter(Task.assigned_agent.has(Agent.last_seen < last_seen_threshold)).update(
             {
                 'failed': datetime.utcnow(),
                 'error': 'Assigned agent reached last seen threshold and is now considered as inactive.'
