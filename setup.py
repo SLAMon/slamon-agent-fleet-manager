@@ -25,7 +25,8 @@ setup(
         'flask-sqlalchemy>=2.0',
         'flask-restless',
         'statsd',
-        'Flask-StatsD'
+        'Flask-StatsD',
+        'enum34'
     ],
     entry_points={
         'console_scripts': [

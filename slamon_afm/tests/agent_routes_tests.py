@@ -347,16 +347,15 @@ class TestPushing(AFMTest):
         )
 
         for state, task in tasks:
-            with self.subTest(msg=state):
-                self.assertEqual(self.test_app.post_json('/tasks/response', {
-                    'protocol': 1,
-                    'task_id': task.uuid,
-                    'task_data': {
-                        'key': 'value',
-                        'another_key': 5
+            self.assertEqual(self.test_app.post_json('/tasks/response', {
+                'protocol': 1,
+                'task_id': task.uuid,
+                'task_data': {
+                    'key': 'value',
+                    'another_key': 5
 
-                    }
-                }, expect_errors=True).status_int, 400)
+                }
+            }, expect_errors=True).status_int, 400, 'Posting response for {} task should fail'.format(state))
 
     def test_push_response_invalid(self):
         # Invalid task id
