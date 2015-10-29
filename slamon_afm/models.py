@@ -173,7 +173,8 @@ class Task(db.Model):
             filter(and_(Task.assigned_agent_uuid.is_(None), Task.completed.is_(None), Task.error.is_(None))). \
             filter(AgentCapability.agent_uuid == agent.uuid). \
             filter(and_(AgentCapability.type == Task.type, AgentCapability.version == Task.version)). \
-            order_by(Task.created)
+            order_by(Task.created). \
+            with_for_update()
 
         # Assign available tasks to the agent and mark them as being in process
         for _, task in query[0:max_tasks]:
