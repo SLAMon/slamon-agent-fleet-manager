@@ -23,7 +23,10 @@ setup(
         'python_dateutil>= 2.4.2, <3.0',
         'flask>=0.10',
         'flask-sqlalchemy>=2.0',
-        'flask-restless'
+        'flask-restless',
+        'statsd',
+        'Flask-StatsD',
+        'enum34'
     ],
     entry_points={
         'console_scripts': [

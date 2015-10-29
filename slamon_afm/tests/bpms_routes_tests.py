@@ -23,17 +23,6 @@ class TestBMPSRoutes(AFMTest):
         self.assertIsInstance(task.data, dict)
         self.assertEqual(task.data['wait_time'], 3600)
 
-        # Test without data
-        self.assertEqual(
-            200,
-            self.test_app.post_json('/task', {
-                'task_id': 'de305d54-75b4-431b-adb2-eb6b9e546014',
-                'test_id': 'de305d54-75b4-431b-adb2-eb6b9e546013',
-                'task_type': 'wait',
-                'task_version': 1
-            }).status_int
-        )
-
     def test_post_task_invalid(self):
         assert self.test_app.post_json('/task', expect_errors=True).status_int == 400
 
@@ -65,6 +54,17 @@ class TestBMPSRoutes(AFMTest):
                 'wait_time': 3600
             }
         }, expect_errors=True).status_int == 400
+
+        # Test without data
+        self.assertEqual(
+            400,
+            self.test_app.post_json('/task', {
+                'task_id': 'de305d54-75b4-431b-adb2-eb6b9e546014',
+                'test_id': 'de305d54-75b4-431b-adb2-eb6b9e546013',
+                'task_type': 'wait',
+                'task_version': 1
+            }, expect_errors=True).status_int
+        )
 
     def test_post_task_duplicate(self):
         task1 = Task()

@@ -2,9 +2,9 @@ import logging
 
 import os
 from flask import Flask
-
 from sqlalchemy import event
 
+from slamon_afm.stats import statsd
 from slamon_afm.models import db
 from slamon_afm.routes import agent_routes, bpms_routes, status_routes, dashboard_routes
 
@@ -44,6 +44,9 @@ class DefaultConfig(object):
     LOG_FILE = os.getenv('LOG_FILE', None)
     LOG_LEVEL = _log_level_from_str(os.getenv('LOG_LEVEL', 'INFO'))
     LOG_FORMAT = os.getenv('LOG_FORMAT', '%(asctime)s - %(name)s - %(levelname)s - %(message).120s')
+    STATSD_HOST = os.getenv('STATSD_HOST', 'localhost')
+    STATSD_PORT = int(os.getenv('STATSD_PORT', 8125))
+    STATSD_PREFIX = os.getenv('STATSD_PREFIX', 'slamon.afm')
 
 
 def create_app(config=None, config_file=None):
@@ -70,6 +73,9 @@ def create_app(config=None, config_file=None):
 
     # register app for Flask-SQLAlchemy DB
     db.init_app(app)
+
+    # init statsd client
+    statsd.init_app(app)
 
     # register app routes
     app.register_blueprint(agent_routes.blueprint)

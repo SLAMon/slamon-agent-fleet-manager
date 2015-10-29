@@ -1,4 +1,5 @@
 from datetime import datetime
+from uuid import uuid4
 
 import jsonschema
 
@@ -303,11 +304,9 @@ class TestPushing(AFMTest):
                 'another_key': 5
             }
         })
-        print(r)
 
         task = db.session.query(Task).filter(Task.uuid == 'de305d54-75b4-431b-adb2-eb6b9e546013').one()
 
-        self.assertIsNotNone(task.completed)
         self.assertIsNotNone(task.completed)
         self.assertIsNotNone(task.result_data)
         self.assertIsNone(task.failed)
@@ -328,6 +327,35 @@ class TestPushing(AFMTest):
         assert task.result_data is None
         assert task.failed is not None
         assert task.error is not None
+
+    def test_push_response_illegal_state(self):
+        def create_task(**kwargs):
+            kwargs.update({
+                'uuid': str(uuid4()),
+                'test_id': 'de305d54-75b4-431b-adb2-eb6b9e546013',
+                'data': {}
+            })
+            task = Task(**kwargs)
+            db.session.add(task)
+            db.session.commit()
+            return task
+
+        tasks = (
+            ('completed', create_task(claimed=datetime.utcnow(), completed=datetime.utcnow())),
+            ('failed', create_task(claimed=datetime.utcnow(), failed=datetime.utcnow())),
+            ('not claimed', create_task())
+        )
+
+        for state, task in tasks:
+            self.assertEqual(self.test_app.post_json('/tasks/response', {
+                'protocol': 1,
+                'task_id': task.uuid,
+                'task_data': {
+                    'key': 'value',
+                    'another_key': 5
+
+                }
+            }, expect_errors=True).status_int, 400, 'Posting response for {} task should fail'.format(state))
 
     def test_push_response_invalid(self):
         # Invalid task id

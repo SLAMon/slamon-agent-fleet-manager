@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import Enum
 import json
 
 from flask import current_app
@@ -7,9 +8,23 @@ from sqlalchemy import Column, Integer, CHAR, DateTime, String, ForeignKey, Prim
     TypeDecorator
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm.exc import NoResultFound
-from sqlalchemy import func
+from sqlalchemy import func, event, case, literal_column
 
 db = SQLAlchemy()
+
+from slamon_afm.stats import statsd
+
+
+class TaskException(Exception):
+    task = None
+
+    def __init__(self, msg, task=None):
+        super(TaskException, self).__init__(msg)
+        self.task = task
+
+
+class IllegalStateException(TaskException):
+    pass
 
 
 class Agent(db.Model):
@@ -41,10 +56,12 @@ class Agent(db.Model):
         Update capabilities of the agent to match the new definitions in agent_capabilities
 
         :param agent_capabilities: A dict describing the new capability set
+        :return: True if any capabilities updated False otherwise
         """
 
         # format capabilities list as a dict of (name,version) pairs
         new_capabilities = {name: int(info['version']) for name, info in agent_capabilities.items()}
+        removed_capabilities = False
 
         # Update existing capabilities
         for capability in self.capabilities:
@@ -53,6 +70,7 @@ class Agent(db.Model):
                 del new_capabilities[capability.type]
             else:
                 self.capabilities.remove(capability)
+                removed_capabilities = True
 
         # Add new capabilities
         for name, version in new_capabilities.items():
@@ -62,6 +80,7 @@ class Agent(db.Model):
                     version=version
                 )
             )
+        return removed_capabilities or len(new_capabilities) > 0
 
     def tasks_summary(self):
         """
@@ -85,23 +104,29 @@ class Agent(db.Model):
         cascades to deassign all claimed tasks.
 
         :param last_seen_threshold: drop agents that have not been seen after this datetime
+        :return: tuple of number of agents, number of tasks affected
         """
 
         # delete agents
-        db.session.query(Agent).filter(Agent.last_seen < last_seen_threshold).delete(synchronize_session=False)
+        count_agents = db.session.query(Agent).filter(Agent.last_seen < last_seen_threshold).delete(
+            synchronize_session=False)
 
-        # mark deassigned tasks as failed. This would be bit more efficient with SQL triggers, but this would
-        # require dialect specific triggers and still maintain this as a fallback when no triggers exists.
-        db.session.query(Task).filter(and_(Task.assigned_agent_uuid == None,
-                                           Task.claimed != None,
-                                           Task.failed == None,
-                                           Task.completed == None)).update(
-            {
-                'failed': datetime.utcnow(),
-                'error': 'Assigned agent reached last seen threshold and is now considered as inactive.'
-            },
-            synchronize_session=False
-        )
+        if count_agents > 0:
+            # mark deassigned tasks as failed. This would be bit more efficient with SQL triggers, but this would
+            # require dialect specific triggers and still maintain this as a fallback when no triggers exists.
+            count_tasks = db.session.query(Task).filter(and_(Task.assigned_agent_uuid == None,
+                                                             Task.claimed != None,
+                                                             Task.failed == None,
+                                                             Task.completed == None)).update(
+                {
+                    'failed': datetime.utcnow(),
+                    'error': 'Assigned agent reached last seen threshold and is now considered as inactive.'
+                },
+                synchronize_session=False
+            )
+
+            return count_agents, count_tasks
+        return 0, 0
 
 
 class AgentCapability(db.Model):
@@ -114,6 +139,25 @@ class AgentCapability(db.Model):
     version = Column('version', Integer)
 
     __table_args__ = (PrimaryKeyConstraint(agent_uuid, type, version),)
+
+    @classmethod
+    def summary(cls, last_seen_threshold=None):
+        """
+        Summarize availability of each capability/version pair.
+
+        :param last_seen_threshold: Optionally filter by only agents seen after datetime
+        """
+        query = db.session.query(cls.type, cls.version, func.count(cls.type)).group_by(cls.type, cls.version)
+        if last_seen_threshold is not None:
+            query = query.filter(cls.agent.has(Agent.last_seen >= last_seen_threshold))
+        for row in query:
+            yield dict(zip(('type', 'version', 'count'), row))
+
+    @classmethod
+    def update_gauges(cls, last_seen_threshold=None):
+        """ Publish capability availability gauges to StatsD """
+        for capability in cls.summary(last_seen_threshold=last_seen_threshold):
+            statsd.gauge('capability.{type}.{version}'.format(**capability), capability['count'])
 
 
 class JSONEncodedDict(TypeDecorator):
@@ -130,6 +174,16 @@ class JSONEncodedDict(TypeDecorator):
         if value is not None:
             value = json.loads(value)
         return value
+
+
+class TaskEvent(Enum):
+    posted = 'posted'
+    claimed = 'claimed'
+    completed = 'completed'
+    error = 'error'
+
+    def __str__(self):
+        return self.value
 
 
 class Task(db.Model):
@@ -160,6 +214,77 @@ class Task(db.Model):
     # Error message that should only be present if failed is set
     error = Column('error', Unicode, nullable=True)
 
+    def send_stats(self, task_event):
+        """Increase stats counters/timers for both total and per task type"""
+        statsd.incr("tasks.{}".format(task_event))
+        if task_event is not TaskEvent.posted:
+            statsd.timing(
+                "tasks.{}.{}.{}".format(self.type, self.version, task_event),
+                int((datetime.now() - self.created).total_seconds() * 1000)
+            )
+        else:
+            statsd.incr("tasks.{}.{}.{}".format(self.type, self.version, task_event))
+        # update gauge values for task type/version
+        Task.update_gauges(filter_criteria=and_(Task.type == self.type, Task.version == self.version))
+
+    def claim(self, agent):
+        """
+        Mark task as claimed and post stats to statsd.
+        Note that to prevent tasks being assigned to multiple agent, the task
+        should be selected with *FOR UPDATE* statement.
+
+        :param agent: The agent the task is being assigned to
+        """
+        current_app.logger.info("Claiming task {} for agent {}".format(self.uuid, agent.uuid))
+        self.assigned_agent_uuid = agent.uuid
+        self.claimed = datetime.utcnow()
+        self.send_stats(TaskEvent.claimed)
+
+    def complete(self, result_data=None, error=None):
+        """
+        Mark task as completed, save results and send stats to statsd.
+
+        :param result_data: Task result data when successfully completed
+        :param error: Task error when completed with an error
+        """
+        if self.completed or self.failed:
+            raise IllegalStateException("Cannot complete a tasks that is already completed!", task=self)
+        elif not self.claimed:
+            raise IllegalStateException("Cannot complete a task that was never claimed!", task=self)
+        elif result_data is not None:
+            self.completed = datetime.utcnow()
+            self.result_data = result_data
+            current_app.logger.info("Task {} completed".format(self.uuid))
+            self.send_stats(TaskEvent.completed)
+        elif error is not None:
+            self.failed = datetime.utcnow()
+            self.error = error
+            current_app.logger.warn("Task {} completed with error".format(self.uuid))
+            self.send_stats(TaskEvent.error)
+        else:
+            raise TaskException("Attempt to complete task neither with results nor errors", task=self)
+
+    @classmethod
+    def task_summary(cls, filter_criteria=None):
+        """ Summarize task counts in database by task type """
+        queued_criteria = and_(cls.claimed == None, cls.completed == None, cls.failed == None)
+        processing_criteria = and_(cls.claimed != None, cls.completed == None, cls.failed == None)
+        query = db.session.query(cls.type, cls.version,
+                                 func.count(case([(queued_criteria, cls.uuid)], else_=literal_column("NULL"))),
+                                 func.count(case([(processing_criteria, cls.uuid)], else_=literal_column("NULL")))) \
+            .group_by(cls.type, cls.version)
+        if filter_criteria is not None:
+            query = query.filter(filter_criteria)
+        for row in query:
+            yield dict(zip(('type', 'version', 'queued', 'processing'), row))
+
+    @classmethod
+    def update_gauges(cls, filter_criteria=None):
+        """ Publish active task counts to StatsD """
+        for task_type in cls.task_summary(filter_criteria=filter_criteria):
+            statsd.gauge('tasks.{type}.{version}.queue'.format(**task_type), task_type['queued'])
+            statsd.gauge('tasks.{type}.{version}.processing'.format(**task_type), task_type['processing'])
+
     @staticmethod
     def claim_tasks(agent, max_tasks):
         """
@@ -178,9 +303,7 @@ class Task(db.Model):
 
         # Assign available tasks to the agent and mark them as being in process
         for _, task in query[0:max_tasks]:
-            current_app.logger.info("Claiming task {} for agent {}".format(task.uuid, agent.uuid))
-            task.assigned_agent_uuid = agent.uuid
-            task.claimed = datetime.utcnow()
+            task.claim(agent)
             yield task
 
     @staticmethod
@@ -189,12 +312,25 @@ class Task(db.Model):
         Mark all tasks claimed by agents that have not been seen after defined datetime as failed
 
         :param last_seen_threshold: select tasks claimed by agents not seen after this datetime
+        :return: number of tasks affected
         """
 
-        db.session.query(Task).filter(Task.assigned_agent.has(Agent.last_seen < last_seen_threshold)).update(
+        return db.session.query(Task).filter(Task.assigned_agent.has(Agent.last_seen < last_seen_threshold)).update(
             {
                 'failed': datetime.utcnow(),
                 'error': 'Assigned agent reached last seen threshold and is now considered as inactive.'
             },
             synchronize_session=False
         )
+
+
+@event.listens_for(Task, 'after_insert')
+def receive_after_insert(mapper, connection, task):
+    del mapper, connection  # unused
+    task.send_stats('posted')
+
+
+@event.listens_for(Task, 'after_delete')
+def receive_after_delete(mapper, connection, task):
+    del mapper, connection  # unused
+    task.send_stats('deleted')
