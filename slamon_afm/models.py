@@ -213,6 +213,8 @@ class Task(db.Model):
             )
         else:
             statsd.incr("tasks.{}.{}.{}".format(self.type, self.version, task_event))
+        # update gauge values for task type/version
+        Task.update_gauges(filter_criteria=and_(Task.type == self.type, Task.version == self.version))
 
     def claim(self, agent):
         """
@@ -223,9 +225,9 @@ class Task(db.Model):
         :param agent: The agent the task is being assigned to
         """
         current_app.logger.info("Claiming task {} for agent {}".format(self.uuid, agent.uuid))
-        self.send_stats(TaskEvent.claimed)
         self.assigned_agent_uuid = agent.uuid
         self.claimed = datetime.utcnow()
+        self.send_stats(TaskEvent.claimed)
 
     def complete(self, result_data=None, error=None):
         """
@@ -243,14 +245,13 @@ class Task(db.Model):
             self.result_data = result_data
             current_app.logger.info("Task {} completed".format(self.uuid))
             self.send_stats(TaskEvent.completed)
-            return
         elif error is not None:
             self.failed = datetime.utcnow()
             self.error = error
             current_app.logger.warn("Task {} completed with error".format(self.uuid))
             self.send_stats(TaskEvent.error)
-            return
-        raise TaskException("Attempt to complete task neither with results nor errors", task=self)
+        else:
+            raise TaskException("Attempt to complete task neither with results nor errors", task=self)
 
     @classmethod
     def task_summary(cls, filter_criteria=None):
@@ -267,9 +268,9 @@ class Task(db.Model):
             yield dict(zip(('type', 'version', 'queued', 'processing'), row))
 
     @classmethod
-    def update_gauges(cls):
+    def update_gauges(cls, filter_criteria=None):
         """ Publish active task counts to StatsD """
-        for task_type in cls.task_summary():
+        for task_type in cls.task_summary(filter_criteria=filter_criteria):
             statsd.gauge('tasks.{type}.{version}.queue'.format(**task_type), task_type['queued'])
             statsd.gauge('tasks.{type}.{version}.processing'.format(**task_type), task_type['processing'])
 

@@ -195,11 +195,16 @@ class TaskStatsTests(AFMTest):
 
     @patch.object(statsd, 'incr', return_value=None)
     @patch.object(statsd, 'timing', return_value=None)
-    def testIncPostedStats(self, timing_mock, incr_mock):
+    @patch.object(statsd, 'gauge', return_value=None)
+    def testIncPostedStats(self, gauge_mock, timing_mock, incr_mock):
         self._addTask()
 
         incr_mock.assert_called_once_with('tasks.posted')
         timing_mock.assert_not_called()
+        gauge_mock.assert_has_calls([
+            call('tasks.task-type-1.1.queue', 1),
+            call('tasks.task-type-1.1.processing', 0)
+        ], any_order=True)
 
     def testIncDeletedStats(self):
         task = self._addTask()
@@ -216,12 +221,17 @@ class TaskStatsTests(AFMTest):
 
         # create list to iterate the generator returned by claim_tasks
         with patch.object(statsd, 'incr', return_value=None) as incr_mock, \
-                patch.object(statsd, 'timing') as timing_mock:
+                patch.object(statsd, 'timing') as timing_mock,\
+                patch.object(statsd, 'gauge') as gauge_mock:
             _ = list(Task.claim_tasks(self.agent, 1))
             db.session.flush()
 
             incr_mock.assert_called_once_with('tasks.claimed')
             timing_mock.assert_called_once_with('tasks.task-type-1.1.claimed', ANY)
+            gauge_mock.assert_has_calls([
+                call('tasks.task-type-1.1.queue', 0),
+                call('tasks.task-type-1.1.processing', 1)
+            ], any_order=True)
 
     def testIncCompletedStats(self):
         # create task with claimed status
@@ -231,13 +241,18 @@ class TaskStatsTests(AFMTest):
         )
 
         with patch.object(statsd, 'incr', return_value=None) as incr_mock, \
-                patch.object(statsd, 'timing') as timing_mock:
+                patch.object(statsd, 'timing') as timing_mock,\
+                patch.object(statsd, 'gauge') as gauge_mock:
             # complete task
             task.complete(result_data={})
             db.session.flush()
 
             incr_mock.assert_called_once_with('tasks.completed')
             timing_mock.assert_called_once_with('tasks.task-type-1.1.completed', ANY)
+            gauge_mock.assert_has_calls([
+                call('tasks.task-type-1.1.queue', 0),
+                call('tasks.task-type-1.1.processing', 0)
+            ], any_order=True)
 
     def testIncErrorStats(self):
         # create task with claimed status
@@ -247,13 +262,18 @@ class TaskStatsTests(AFMTest):
         )
 
         with patch.object(statsd, 'incr', return_value=None) as incr_mock, \
-                patch.object(statsd, 'timing') as timing_mock:
+                patch.object(statsd, 'timing') as timing_mock,\
+                patch.object(statsd, 'gauge') as gauge_mock:
             # complete task
             task.complete(error='test')
             db.session.flush()
 
             incr_mock.assert_called_once_with('tasks.error')
             timing_mock.assert_called_once_with('tasks.task-type-1.1.error', ANY)
+            gauge_mock.assert_has_calls([
+                call('tasks.task-type-1.1.queue', 0),
+                call('tasks.task-type-1.1.processing', 0)
+            ], any_order=True)
 
     def testCapabilitySummary(self):
         # add three more agents, with different last seen values
